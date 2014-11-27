@@ -562,6 +562,67 @@ void Plane::handle_auto_mode(void)
     }
 }
 
+void Plane::handle_rtl_go_around()
+{
+//adding histeresis
+#define RAPID_CLIMBOUT_IN_ALT     30
+#define RAPID_CLIMBOUT_OUT_ALT    50
+
+    if ((relative_altitude() <= RAPID_CLIMBOUT_IN_ALT) && \
+       (auto_state.takeoff_complete == true))
+    {
+        //Initiate rapid level climbout
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Below %dm; commencing Rapid Climbout.\n",RAPID_CLIMBOUT_IN_ALT);
+        auto_state.takeoff_complete = false;
+        auto_state.takeoff_altitude_rel_cm = RAPID_CLIMBOUT_OUT_ALT * 100;
+        auto_state.takeoff_pitch_cd = (auto_state.takeoff_pitch_cd > 0) ? \
+                                            auto_state.takeoff_pitch_cd : 500;
+        if (ahrs.yaw_initialised())
+        {
+            if (steer_state.hold_course_cd == -1) {
+                // save our current course to take off
+                steer_state.hold_course_cd = ahrs.yaw_sensor;
+                gcs_send_text_fmt(MAV_SEVERITY_INFO, "Holding course %ld", steer_state.hold_course_cd);
+            }
+        }
+    }
+    else if ((auto_state.takeoff_complete == false) && \
+            (relative_altitude() > RAPID_CLIMBOUT_OUT_ALT))
+    {
+        gcs_send_text_fmt(MAV_SEVERITY_INFO, "Rapid Climbout finished; resuming RTL.\n");
+        steer_state.hold_course_cd = -1;
+        auto_state.takeoff_complete = true;
+        //re-init normal RTL behavior
+        g.airspeed_cruise_cm.load();
+        g.min_gndspeed_cm.load();
+        aparm.throttle_cruise.load();
+        do_RTL(get_RTL_altitude());
+    }
+
+    if (auto_state.takeoff_complete == false) {
+        //climb straight ahead to RAPID_CLIMBOUT_OUT_ALT
+        if (steer_state.hold_course_cd != -1) 
+        {
+            // call navigation controller for heading hold
+            nav_controller->update_heading_hold(steer_state.hold_course_cd);
+        } else {
+            nav_controller->update_level_flight();
+        }
+
+        takeoff_calc_roll();
+        takeoff_calc_pitch();
+        if(aparm.takeoff_throttle_max != 0) {
+            channel_throttle->set_servo_out(aparm.takeoff_throttle_max);
+        } else {
+            channel_throttle->set_servo_out(aparm.throttle_max);
+        }
+    } else {
+        calc_nav_roll();
+        calc_nav_pitch();
+        calc_throttle();
+    }
+}
+
 /*
   main flight mode dependent update code 
  */
@@ -572,8 +633,8 @@ void Plane::update_flight_mode(void)
         effective_mode = FLY_BY_WIRE_A;
     }
 
-    if (effective_mode != AUTO) {
-        // hold_course is only used in takeoff and landing
+    if ((effective_mode != AUTO) && (effective_mode != RTL)) {
+        // hold_course is only used in takeoff, landing and go-around
         steer_state.hold_course_cd = -1;
     }
 
@@ -599,6 +660,9 @@ void Plane::update_flight_mode(void)
         // fall through
 
     case RTL:
+        handle_rtl_go_around();
+        break;
+
     case LOITER:
         calc_nav_roll();
         calc_nav_pitch();
@@ -813,7 +877,14 @@ void Plane::update_navigation()
         if (radius > 0) {
             loiter.direction = (g.rtl_radius < 0) ? -1 : 1;
         }
-        // fall through to LOITER
+
+        // when GOING AROUND is finished then update loiter  
+        if (auto_state.takeoff_complete == true)
+        {
+            radius = abs(g.rtl_radius);
+            update_loiter(radius);
+        }
+        break;
 
     case LOITER:
     case AVOID_ADSB:
