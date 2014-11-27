@@ -447,9 +447,8 @@ void PX4RCOutput::_send_outputs(void)
         goto update_pwm;
     }
 
-    // always send at least at 20Hz, otherwise the IO board may think
-    // we are dead
-    if (now - _last_output > 50000) {
+    // always send at least at 50Hz to minimize jitter
+    if (now - _last_output > 19500) {
         _need_update = true;
     }
 
