@@ -99,13 +99,17 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	    // If no airspeed available use average of min and max
         aspeed = 0.5f*(float(aspd_min) + float(aparm.airspeed_max));
 	}
-    rate_offset = (GRAVITY_MSS / max(aspeed , float(aspd_min))) * tanf(bank_angle) * cosf(bank_angle) * _K_FF;
+    rate_offset = (GRAVITY_MSS / max(aspeed , float(aspd_min))) * sinf(bank_angle) * _K_FF;
 
     // Get body rate vector (radians/sec)
 	float omega_z = _ahrs.get_gyro().z;
 	
 	// Get the accln vector (m/s^2)
 	float accel_y = _ahrs.get_ins().get_accel().y;
+
+    //Apply low-pass filter to the acc_y input
+    float accel_y_out = _last_accel_y * 0.8 + accel_y * 0.2;
+    _last_accel_y = accel_y_out;
 
 	// Subtract the steady turn component of rate from the measured rate
 	// to calculate the rate relative to the turn requirement in degrees/sec
@@ -120,7 +124,7 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	_last_rate_hp_in = rate_hp_in;
 
 	//Calculate input to integrator
-	float integ_in = - _K_I * (_K_A * accel_y + rate_hp_out);
+	float integ_in = - _K_I * rate_hp_out;
 	
 	// Apply integrator, but clamp input to prevent control saturation and freeze integrator below min FBW speed
 	// Don't integrate if in stabilise mode as the integrator will wind up against the pilots inputs
@@ -165,9 +169,7 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	// Save to last value before application of limiter so that integrator limiting
 	// can detect exceedance next frame
 	// Scale using inverse dynamic pressure (1/V^2)
-	_pid_info.I = _K_D * _integrator * scaler * scaler;
-	_pid_info.D = _K_D * (-rate_hp_out) * scaler * scaler;
-	_last_out =  _pid_info.I + _pid_info.D;
+	_last_out =  (_K_D * (_integrator - rate_hp_out) - _K_A * accel_y_out ) * scaler * scaler;
 
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);

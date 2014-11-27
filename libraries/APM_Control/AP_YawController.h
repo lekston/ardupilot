@@ -37,6 +37,7 @@ private:
 	AP_Float _K_FF;
     AP_Int16 _imax;
 	uint32_t _last_t;
+    float _last_accel_y;
 	float _last_error;
 	float _last_out;
 	float _last_rate_hp_out;
