@@ -53,6 +53,7 @@ void PX4Scheduler::init()
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
 	pthread_create(&_timer_thread_ctx, &thread_attr, &PX4Scheduler::_timer_thread, this);
+    pthread_setname_np(_timer_thread_ctx, "APM_timers");
 
     // the UART thread runs at a medium priority
 	pthread_attr_init(&thread_attr);
@@ -63,6 +64,7 @@ void PX4Scheduler::init()
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
 	pthread_create(&_uart_thread_ctx, &thread_attr, &PX4Scheduler::_uart_thread, this);
+    pthread_setname_np(_uart_thread_ctx, "APM_uarts");
 
     // the IO thread runs at lower priority
 	pthread_attr_init(&thread_attr);
@@ -73,6 +75,7 @@ void PX4Scheduler::init()
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
 	pthread_create(&_io_thread_ctx, &thread_attr, &PX4Scheduler::_io_thread, this);
+    pthread_setname_np(_io_thread_ctx, "APM_io");
 
     // the storage thread runs at just above IO priority
     pthread_attr_init(&thread_attr);
@@ -83,6 +86,7 @@ void PX4Scheduler::init()
     pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
 
     pthread_create(&_storage_thread_ctx, &thread_attr, &PX4Scheduler::_storage_thread, this);
+    pthread_setname_np(_storage_thread_ctx, "APM_storage");
 }
 
 /**
