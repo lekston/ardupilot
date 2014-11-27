@@ -839,6 +839,7 @@ private:
     void takeoff_calc_roll(void);
     void takeoff_calc_pitch(void);
     int8_t takeoff_tail_hold(void);
+    uint8_t takeoff_throttle(void);
     void print_hit_enter();
     void ahrs_update();
     void update_speed_height(void);
@@ -866,6 +867,7 @@ private:
     void determine_is_flying(void);
     void gcs_send_text_fmt(const prog_char_t *fmt, ...);
     void handle_auto_mode(void);
+    void handle_rtl_go_around(void);
     void calc_throttle();
     void calc_nav_roll();
     void calc_nav_pitch();
