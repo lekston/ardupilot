@@ -139,6 +139,7 @@ public:
         k_param_rudder_only,
         k_param_gcs3,            // 93
         k_param_gcs_pid_mask,
+        k_param_approach_pitch_cd, //PrL, 95
 
         // 100: Arming parameters
         k_param_arming = 100,
@@ -442,6 +443,7 @@ public:
     AP_Int8 reset_mission_chan;
     AP_Int32 airspeed_cruise_cm;
     AP_Int32 RTL_altitude_cm;
+    AP_Int16 approach_pitch_cd;
     AP_Float land_flare_alt;
     AP_Int8 land_disarm_delay;
     AP_Int32 min_gndspeed_cm;
