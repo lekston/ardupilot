@@ -31,16 +31,21 @@ private:
 	const AP_Vehicle::FixedWing &aparm;
 	AP_Float _K_A;
 	AP_Float _K_I;
+	AP_Float _K_I_A;
 	AP_Float _K_D;
 	AP_Float _K_FF;
-    AP_Int16 _imax;
+	AP_Int16 _imax;
+	AP_Int16 _imax_A;
 	uint32_t _last_t;
+	float _last_accel_y;
+	float _last_error;
 	float _last_out;
 	float _last_rate_hp_out;
 	float _last_rate_hp_in;
 	float _K_D_last;
 
 	float _integrator;
+	float _integrator_A;
 
 	DataFlash_Class::PID_Info _pid_info;
 

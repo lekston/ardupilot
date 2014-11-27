@@ -53,6 +53,7 @@ public:
         k_param_g2,
         k_param_avoidance_adsb,
         k_param_approach_pitch_cd = 7, // PrL
+        k_param_kff_throttle_to_rudder = 8, //PrL
 
         // Misc
         //
@@ -377,6 +378,7 @@ public:
     AP_Float kff_rudder_mix;
     AP_Float kff_pitch_to_throttle;
     AP_Float kff_throttle_to_pitch;
+    AP_Float kff_throttle_to_rudder;
     AP_Float ground_steer_alt;
     AP_Int16 ground_steer_dps;
     AP_Float stab_pitch_down;

@@ -467,6 +467,9 @@ void Plane::calc_nav_yaw_coordinated(float speed_scaler)
 
         // add in rudder mixing from roll
         commanded_rudder += channel_roll->get_servo_out() * g.kff_rudder_mix;
+        // add in rudder mixing from throttle
+        float kff_thr2rdr = ((float)throttle_percentage() - (float)aparm.throttle_cruise);
+        commanded_rudder += kff_thr2rdr * 100 * g.kff_throttle_to_rudder;
         commanded_rudder += rudder_input;
     }
 

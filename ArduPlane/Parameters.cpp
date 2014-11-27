@@ -95,6 +95,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(kff_throttle_to_pitch,  "KFF_THR2PTCH",   0),
 
+    // @Param: KFF_THR2RDR
+    // @DisplayName: Throttle to Rudder Mix
+    // @Description: Throttle to rudder feed-forward gain.
+    // @Range: -10 10
+    // @Increment: 0.01
+    // @User: Advanced
+    GSCALAR(kff_throttle_to_rudder,  "KFF_THR2RDR",   0),
+
     // @Param: STAB_PITCH_DOWN
     // @DisplayName: Low throttle pitch down trim 
     // @Description: This controls the amount of down pitch to add in FBWA and AUTOTUNE modes when at low throttle. No down trim is added when throttle is above TRIM_THROTTLE. Below TRIM_THROTTLE downtrim is added in proportion to the amount the throttle is below TRIM_THROTTLE. At zero throttle the full downpitch specified in this parameter is added. This parameter is meant to help keep airspeed up when flying in FBWA mode with low throttle, such as when on a landing approach, without relying on an airspeed sensor. A value of 2 degrees is good for many planes, although a higher value may be needed for high drag aircraft.
