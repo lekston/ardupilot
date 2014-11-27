@@ -969,6 +969,7 @@ private:
     void crash_detection_update(void);
     bool in_preLaunch_flight_stage(void);
     void handle_auto_mode(void);
+    void handle_rtl_go_around(void);
     void calc_throttle();
     void calc_nav_roll();
     void calc_nav_pitch();
