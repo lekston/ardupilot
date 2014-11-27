@@ -172,3 +172,13 @@ return_zero:
     return 0;
 }
 
+/*
+  return throttle percentage for takeoff
+ */
+uint8_t Plane::takeoff_throttle(void)
+{
+    if (aparm.takeoff_throttle_max != 0) {
+        return aparm.takeoff_throttle_max;
+    }
+    return aparm.throttle_max;
+}

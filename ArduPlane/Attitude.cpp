@@ -507,7 +507,7 @@ void Plane::calc_nav_roll()
 void Plane::throttle_slew_limit(int16_t last_throttle)
 {
     uint8_t slewrate = aparm.throttle_slewrate;
-    if (control_mode==AUTO && auto_state.takeoff_complete == false && g.takeoff_throttle_slewrate != 0) {
+    if ((control_mode==AUTO || control_mode==RTL) && auto_state.takeoff_complete == false && g.takeoff_throttle_slewrate != 0) {
         slewrate = g.takeoff_throttle_slewrate;
     }
     // if slew limit rate is set to zero then do not slew limit
@@ -847,11 +847,7 @@ void Plane::set_servos(void)
             min_throttle = 0;
         }
         if (control_mode == AUTO && flight_stage == AP_SpdHgtControl::FLIGHT_TAKEOFF) {
-            if(aparm.takeoff_throttle_max != 0) {
-                max_throttle = aparm.takeoff_throttle_max;
-            } else {
-                max_throttle = aparm.throttle_max;
-            }
+            takeoff_throttle();
         }
         channel_throttle->servo_out = constrain_int16(channel_throttle->servo_out, 
                                                       min_throttle,
