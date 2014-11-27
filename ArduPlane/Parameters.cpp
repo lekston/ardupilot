@@ -258,6 +258,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(land_slope_recalc_steep_threshold_to_abort,          "LAND_ABORT_DEG", 0),
 
+    // @Param: LAND_APP_PITCH_CD
+    // @DisplayName: Minimum approach pitch
+    // @Description: This controls the minimum pitch angle in centi-degrees during initial stage of landing
+    // @Units: degrees
+    // @Range: -1000 1000
+    // @Increment: 1
+    // @User: User
+    GSCALAR(approach_pitch_cd,              "LAND_APP_PITCH",   -400),
+
     // @Param: LAND_PITCH_CD
     // @DisplayName: Landing Pitch
     // @Description: Used in autoland to give the minimum pitch in the final stage of landing (after the flare). This parameter can be used to ensure that the final landing attitude is appropriate for the type of undercarriage on the aircraft. Note that it is a minimum pitch only - the landing code will control pitch above this value to try to achieve the configured landing sink rate.

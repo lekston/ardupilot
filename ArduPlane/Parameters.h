@@ -52,6 +52,7 @@ public:
         k_param_NavEKF2,
         k_param_g2,
         k_param_avoidance_adsb,
+        k_param_approach_pitch_cd = 7, // PrL
 
         // Misc
         //
@@ -475,6 +476,7 @@ public:
     AP_Int8 reset_mission_chan;
     AP_Int32 airspeed_cruise_cm;
     AP_Int32 RTL_altitude_cm;
+    AP_Int16 approach_pitch_cd;
     AP_Float land_flare_alt;
     AP_Int8 land_disarm_delay;
     AP_Int8 land_then_servos_neutral;

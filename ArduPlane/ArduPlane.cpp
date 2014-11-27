@@ -534,6 +534,12 @@ void Plane::handle_auto_mode(void)
             // during final approach constrain roll to the range
             // allowed for level flight
             nav_roll_cd = constrain_int32(nav_roll_cd, -g.level_roll_limit*100UL, g.level_roll_limit*100UL);
+        } else {
+            if (!airspeed.use()) {
+                // when not under airspeed control, don't allow
+                // down pitch in landing
+                nav_pitch_cd = constrain_int32(nav_pitch_cd, g.approach_pitch_cd, nav_pitch_cd);
+            }
         }
         calc_throttle();
         
