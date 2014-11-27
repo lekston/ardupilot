@@ -203,7 +203,7 @@ public:
         k_param_serial_manager, // serial manager library
         k_param_NavEKF2_old,  // deprecated - remove
         k_param_land_pre_flare_alt, // unused - moved to AP_Landing
-        k_param_land_pre_flare_airspeed = 149,  // unused - moved to AP_Landing
+        k_param_kff_throttle_to_rudder = 149, //PrL - in-place of unused k_param_land_flap_percent
 
         //
         // 150: Navigation parameters
@@ -366,6 +366,7 @@ public:
     AP_Float kff_rudder_mix;
     AP_Float kff_pitch_to_throttle;
     AP_Float kff_throttle_to_pitch;
+    AP_Float kff_throttle_to_rudder;
     AP_Float ground_steer_alt;
     AP_Int16 ground_steer_dps;
     AP_Float stab_pitch_down;
