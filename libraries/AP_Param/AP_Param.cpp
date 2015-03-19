@@ -447,8 +447,10 @@ uint8_t AP_Param::type_size(enum ap_var_type type)
     case AP_PARAM_INT16:
         return 2;
     case AP_PARAM_INT32:
+    case AP_PARAM_INT32_S:
         return 4;
     case AP_PARAM_FLOAT:
+    case AP_PARAM_FLOAT_S:
         return 4;
     case AP_PARAM_VECTOR3F:
         return 3*4;
@@ -829,8 +831,14 @@ void AP_Param::set_value(enum ap_var_type type, void *ptr, float value)
     case AP_PARAM_INT32:
         ((AP_Int32 *)ptr)->set(value);
         break;
+    case AP_PARAM_INT32_S:
+        ((AP_Int32S *)ptr)->set(value);
+        break;
     case AP_PARAM_FLOAT:
         ((AP_Float *)ptr)->set(value);
+        break;
+    case AP_PARAM_FLOAT_S:
+        ((AP_FloatS *)ptr)->set(value);
         break;
     default:
         break;
@@ -1055,13 +1063,26 @@ AP_Param *AP_Param::next_scalar(ParamToken *token, enum ap_var_type *ptype)
 {
     AP_Param *ap;
     enum ap_var_type type;
-    while ((ap = next(token, &type)) != NULL && type > AP_PARAM_FLOAT) ;
+    while ((ap = next(token, &type)) != NULL && type > AP_PARAM_FLOAT \
+            && type < AP_PARAM_INT8_S) ;
     if (ap != NULL && ptype != NULL) {
         *ptype = type;
     }
     return ap;
 }
 
+/// Returns the next securily reportable in _var_info, recursing into groups
+/// as needed
+AP_Param *AP_Param::next_safe(ParamToken *token, enum ap_var_type *ptype)
+{
+    AP_Param *ap;
+    enum ap_var_type type;
+    while ((ap = next(token, &type)) != NULL && type < AP_PARAM_INT8_S) ;
+    if (ap != NULL && ptype != NULL) {
+        *ptype = type;
+    }
+    return ap;
+}
 
 /// cast a variable to a float given its type
 float AP_Param::cast_to_float(enum ap_var_type type) const
@@ -1072,8 +1093,10 @@ float AP_Param::cast_to_float(enum ap_var_type type) const
     case AP_PARAM_INT16:
         return ((AP_Int16 *)this)->cast_to_float();
     case AP_PARAM_INT32:
+    case AP_PARAM_INT32_S:
         return ((AP_Int32 *)this)->cast_to_float();
     case AP_PARAM_FLOAT:
+    case AP_PARAM_FLOAT_S:
         return ((AP_Float *)this)->cast_to_float();
     default:
         return NAN;
@@ -1087,16 +1110,22 @@ void AP_Param::show(const AP_Param *ap, const char *s,
 {
     switch (type) {
     case AP_PARAM_INT8:
-        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int8 *)ap)->get());
+//        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int8 *)ap)->get());
         break;
     case AP_PARAM_INT16:
-        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int16 *)ap)->get());
+//        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int16 *)ap)->get());
         break;
     case AP_PARAM_INT32:
-        port->printf_P(PSTR("%s: %ld\n"), s, (long)((AP_Int32 *)ap)->get());
+//        port->printf_P(PSTR("%s: %ld\n"), s, (long)((AP_Int32 *)ap)->get());
+        break;
+    case AP_PARAM_INT32_S:
+        port->printf_P(PSTR("%s: %ld\n"), s, (long)((AP_Int32S *)ap)->get());
         break;
     case AP_PARAM_FLOAT:
-        port->printf_P(PSTR("%s: %f\n"), s, (double)((AP_Float *)ap)->get());
+//        port->printf_P(PSTR("%s: %f\n"), s, ((AP_Float *)ap)->get());
+        break;
+    case AP_PARAM_FLOAT_S:
+        port->printf_P(PSTR("%s: %f\n"), s, (double)((AP_FloatS *)ap)->get());
         break;
     default:
         break;
@@ -1217,11 +1246,18 @@ void AP_Param::set_float(float value, enum ap_var_type var_type)
     // handle variables with standard type IDs
     if (var_type == AP_PARAM_FLOAT) {
         ((AP_Float *)this)->set(value);
+    } else if (var_type == AP_PARAM_FLOAT_S) {
+        ((AP_FloatS *)this)->set_and_save(packet.param_value);
     } else if (var_type == AP_PARAM_INT32) {
         if (value < 0) rounding_addition = -rounding_addition;
         float v = value+rounding_addition;
         v = constrain_float(v, -2147483648.0, 2147483647.0);
         ((AP_Int32 *)this)->set(v);
+    } else if (var_type == AP_PARAM_INT32_S) {
+        if (packet.param_value < 0) rounding_addition = -rounding_addition;
+        float v = packet.param_value+rounding_addition;
+        v = constrain_float(v, -2147483648.0, 2147483647.0);
+        ((AP_Int32S *)this)->set_and_save(v);
     } else if (var_type == AP_PARAM_INT16) {
         if (value < 0) rounding_addition = -rounding_addition;
         float v = value+rounding_addition;

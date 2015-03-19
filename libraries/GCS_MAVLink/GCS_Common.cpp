@@ -112,7 +112,7 @@ GCS_MAVLINK::_count_parameters()
         vp = AP_Param::first(&token, NULL);
         do {
             _parameter_count++;
-        } while (NULL != (vp = AP_Param::next_scalar(&token, NULL)));
+        } while (NULL != (vp = AP_Param::next_safe(&token, NULL)));
     }
     return _parameter_count;
 }
@@ -167,7 +167,7 @@ GCS_MAVLINK::queued_param_send()
             _queued_parameter_count,
             _queued_parameter_index);
 
-        _queued_parameter = AP_Param::next_scalar(&_queued_parameter_token, &_queued_parameter_type);
+        _queued_parameter = AP_Param::next_safe(&_queued_parameter_token, &_queued_parameter_type);
         _queued_parameter_index++;
     }
     _queued_parameter_send_time_ms = tnow;

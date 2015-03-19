@@ -62,7 +62,11 @@ enum ap_var_type {
     AP_PARAM_VECTOR3F,
     AP_PARAM_VECTOR6F,
     AP_PARAM_MATRIX3F,
-    AP_PARAM_GROUP
+    AP_PARAM_GROUP,
+    AP_PARAM_INT8_S,
+    AP_PARAM_INT16_S,
+    AP_PARAM_INT32_S,
+    AP_PARAM_FLOAT_S
 };
 
 /// Base class for variables.
@@ -252,6 +256,10 @@ public:
     /// Returns the next scalar variable in _var_info, recursing into groups
     /// as needed
     static AP_Param *       next_scalar(ParamToken *token, enum ap_var_type *ptype);
+
+    /// Returns the next securily reportable variable in _var_info, recursing into groups
+    /// as needed
+    static AP_Param *       next_safe(ParamToken *token, enum ap_var_type *ptype);
 
     /// cast a variable to a float given its type
     float                   cast_to_float(enum ap_var_type type) const;
@@ -608,6 +616,9 @@ AP_PARAMDEF(float, Float, AP_PARAM_FLOAT);    // defines AP_Float
 AP_PARAMDEF(int8_t, Int8, AP_PARAM_INT8);     // defines AP_Int8
 AP_PARAMDEF(int16_t, Int16, AP_PARAM_INT16);  // defines AP_Int16
 AP_PARAMDEF(int32_t, Int32, AP_PARAM_INT32);  // defines AP_Int32
+
+AP_PARAMDEF(float, FloatS, AP_PARAM_FLOAT_S);    // defines AP_FloatS
+AP_PARAMDEF(int32_t, Int32S, AP_PARAM_INT32_S);   // defines AP_Int32S
 
 // declare an array type
 // _t is the base type
