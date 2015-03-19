@@ -127,7 +127,7 @@ protected:
     AP_Float    _volt_multiplier[AP_BATT_MONITOR_MAX_INSTANCES];    /// voltage on volt pin multiplied by this to calculate battery voltage
     AP_Float    _curr_amp_per_volt[AP_BATT_MONITOR_MAX_INSTANCES];  /// voltage on current pin multiplied by this to calculate current in amps
     AP_Float    _curr_amp_offset[AP_BATT_MONITOR_MAX_INSTANCES];    /// offset voltage that is subtracted from current pin before conversion to amps
-    AP_Int32    _pack_capacity[AP_BATT_MONITOR_MAX_INSTANCES];      /// battery pack capacity less reserve in mAh
+    AP_Int32S    _pack_capacity[AP_BATT_MONITOR_MAX_INSTANCES];      /// battery pack capacity less reserve in mAh
     AP_Int16    _watt_max[AP_BATT_MONITOR_MAX_INSTANCES];           /// max battery power allowed. Reduce max throttle to reduce current to satisfy this limit
 
 private:

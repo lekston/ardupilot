@@ -90,6 +90,8 @@ void Plane::setup()
 {
     cliSerial = hal.console;
 
+    AP_Param::set_params_unlocked();
+
     // load the default values of variables listed in var_info[]
     AP_Param::setup_sketch_defaults();
 

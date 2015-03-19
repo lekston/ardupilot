@@ -100,6 +100,7 @@ bool _px4_thread_should_exit = false;        /**< Daemon exit flag */
 static bool thread_running = false;        /**< Daemon status flag */
 static int daemon_task;                /**< Handle of daemon task / thread */
 bool px4_ran_overtime;
+bool _px4_unlock_params = false;
 
 extern const AP_HAL::HAL& hal;
 
@@ -268,6 +269,11 @@ void HAL_PX4::run(int argc, char * const argv[], Callbacks* callbacks) const
                 printf("\t%s is not started\n", SKETCHNAME);
             }
             exit(0);
+        }
+
+        if (strcmp(argv[i], "-u") == 0) {
+            // unlock parameter access
+            _px4_unlock_params = true;
         }
 
         if (strcmp(argv[i], "-d") == 0) {

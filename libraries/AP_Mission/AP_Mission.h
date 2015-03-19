@@ -488,7 +488,7 @@ private:
     const AP_AHRS&   _ahrs;      // used only for home position
 
     // parameters
-    AP_Int16                _cmd_total;  // total number of commands in the mission
+    AP_Int16S               _cmd_total;  // total number of commands in the mission
     AP_Int8                 _restart;   // controls mission starting point when entering Auto mode (either restart from beginning of mission or resume from last command run)
 
     // pointer to main program functions

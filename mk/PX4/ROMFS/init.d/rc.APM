@@ -258,12 +258,24 @@ else
     sh /etc/init.d/rc.error
 fi
 
-echo Starting ArduPilot $deviceA $deviceC $deviceD
-if ArduPilot -d $deviceA -d2 $deviceC -d3 $deviceD start
+if [ -f /fs/microsd/APM/p_unlock ]
 then
-    echo ArduPilot started OK
+    echo "Setting up parameter access"
+    echo Starting ArduPilot $deviceA $deviceC $deviceD
+    if ArduPilot -d $deviceA -d2 $deviceC -d3 $deviceD -u start
+    then
+        echo "ArduPilot started OK with unlocked params"
+    else
+        sh /etc/init.d/rc.error
+    fi
 else
-    sh /etc/init.d/rc.error
+    echo Starting ArduPilot $deviceA $deviceC $deviceD
+    if ArduPilot -d $deviceA -d2 $deviceC -d3 $deviceD start
+    then
+        echo "ArduPilot started OK"
+    else
+        sh /etc/init.d/rc.error
+    fi
 fi
 
 echo "rc.APM finished"

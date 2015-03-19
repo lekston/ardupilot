@@ -32,7 +32,7 @@ bool is_equal(const FloatOne, const FloatTwo);
  */
 template <class T>
 inline bool is_zero(const T fVal1) {
-    static_assert(std::is_floating_point<T>::value || std::is_base_of<T,AP_Float>::value,
+    static_assert(std::is_floating_point<T>::value || std::is_base_of<T,AP_Float>::value || std::is_base_of<T,AP_FloatS>::value,
                   "Template parameter not of type float");
     return fabsf(static_cast<float>(fVal1)) < FLT_EPSILON ? true : false;
 }

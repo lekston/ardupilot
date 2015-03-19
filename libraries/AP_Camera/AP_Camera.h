@@ -92,7 +92,7 @@ private:
                                      hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
 #endif
     
-    AP_Float        _trigg_dist;        // distance between trigger points (meters)
+    AP_FloatS       _trigg_dist;        // distance between trigger points (meters)
     AP_Int16        _min_interval;      // Minimum time between shots required by camera
     AP_Int16        _max_roll;          // Maximum acceptable roll angle when trigging camera
     uint32_t        _last_photo_time;   // last time a photo was taken

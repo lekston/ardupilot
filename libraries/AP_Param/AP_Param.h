@@ -84,7 +84,11 @@ enum ap_var_type {
     AP_PARAM_INT32,
     AP_PARAM_FLOAT,
     AP_PARAM_VECTOR3F,
-    AP_PARAM_GROUP
+    AP_PARAM_GROUP,
+    AP_PARAM_INT8_S,
+    AP_PARAM_INT16_S,
+    AP_PARAM_INT32_S,
+    AP_PARAM_FLOAT_S
 };
 
 
@@ -328,6 +332,10 @@ public:
     /// as needed
     static AP_Param *       next_scalar(ParamToken *token, enum ap_var_type *ptype);
 
+    /// Returns the next securily reportable variable in _var_info, recursing into groups
+    /// as needed
+    static AP_Param *       next_safe(ParamToken *token, enum ap_var_type *ptype);
+
     /// cast a variable to a float given its type
     float                   cast_to_float(enum ap_var_type type) const;
 
@@ -346,6 +354,9 @@ public:
     // count of parameters in tree
     static uint16_t count_parameters(void);
     
+    static bool             check_params_unlocked(void);
+    static void             set_params_unlocked(void);
+
 private:
     /// EEPROM header
     ///
@@ -474,6 +485,7 @@ private:
     // send a parameter to all GCS instances
     void send_parameter(const char *name, enum ap_var_type param_header_type, uint8_t idx) const;
     
+    static bool                 _p_unlock;
     static StorageAccess        _storage;
     static uint16_t             _num_vars;
     static uint16_t             _parameter_count;
@@ -727,6 +739,10 @@ AP_PARAMDEF(float, Float, AP_PARAM_FLOAT);    // defines AP_Float
 AP_PARAMDEF(int8_t, Int8, AP_PARAM_INT8);     // defines AP_Int8
 AP_PARAMDEF(int16_t, Int16, AP_PARAM_INT16);  // defines AP_Int16
 AP_PARAMDEF(int32_t, Int32, AP_PARAM_INT32);  // defines AP_Int32
+AP_PARAMDEF(float, FloatS, AP_PARAM_FLOAT_S);    // defines AP_FloatS
+AP_PARAMDEF(int8_t, Int8S, AP_PARAM_INT8_S);     // defines AP_Int8S
+AP_PARAMDEF(int16_t, Int16S, AP_PARAM_INT16_S);  // defines AP_Int16S
+AP_PARAMDEF(int32_t, Int32S, AP_PARAM_INT32_S);  // defines AP_Int32S
 
 // declare a non-scalar type
 // this is used in AP_Math.h
