@@ -89,6 +89,7 @@ bool _px4_thread_should_exit = false;        /**< Daemon exit flag */
 static bool thread_running = false;        /**< Daemon status flag */
 static int daemon_task;                /**< Handle of daemon task / thread */
 bool px4_ran_overtime;
+bool _px4_unlock_params = false;
 
 extern const AP_HAL::HAL& hal;
 
@@ -116,7 +117,7 @@ static void loop_overtime(void *)
 
 static int main_loop(int argc, char **argv)
 {
-    extern void setup(void);
+    extern void setup(bool);
     extern void loop(void);
 
 
@@ -140,7 +141,7 @@ static int main_loop(int argc, char **argv)
 
     schedulerInstance.hal_initialized();
 
-    setup();
+    setup(_px4_unlock_params);
     hal.scheduler->system_initialized();
 
     perf_counter_t perf_loop = perf_alloc(PC_ELAPSED, "APM_loop");
@@ -256,6 +257,11 @@ void HAL_PX4::init(int argc, char * const argv[]) const
                 printf("\t%s is not started\n", SKETCHNAME);
             }
             exit(0);
+        }
+
+        if (strcmp(argv[i], "-u") == 0) {
+            // unlock parameter access
+            _px4_unlock_params = true;
         }
 
         if (strcmp(argv[i], "-d") == 0) {
