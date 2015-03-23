@@ -126,7 +126,11 @@ public:
     friend class AP_Arming_Plane;
 
     Plane(void);
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    void setup(bool);
+#else
     void setup();
+#endif
     void loop();
 
 private:

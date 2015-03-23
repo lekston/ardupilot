@@ -267,6 +267,9 @@ public:
     // check var table for consistency
     static bool             check_var_info(void);
 
+    static bool             check_params_unlocked(void);
+    static void             set_params_unlocked(void);
+
 private:
     /// EEPROM header
     ///
@@ -376,6 +379,7 @@ private:
     static bool load_defaults_file(const char *filename);
 #endif
 
+    static bool                 _p_unlock;
     static StorageAccess        _storage;
     static uint8_t              _num_vars;
     static const struct Info *  _var_info;
@@ -618,7 +622,9 @@ AP_PARAMDEF(int16_t, Int16, AP_PARAM_INT16);  // defines AP_Int16
 AP_PARAMDEF(int32_t, Int32, AP_PARAM_INT32);  // defines AP_Int32
 
 AP_PARAMDEF(float, FloatS, AP_PARAM_FLOAT_S);    // defines AP_FloatS
-AP_PARAMDEF(int32_t, Int32S, AP_PARAM_INT32_S);   // defines AP_Int32S
+AP_PARAMDEF(int8_t, Int8S, AP_PARAM_INT8_S);     // defines AP_Int8S
+AP_PARAMDEF(int16_t, Int16S, AP_PARAM_INT16_S);  // defines AP_Int16S
+AP_PARAMDEF(int32_t, Int32S, AP_PARAM_INT32_S);  // defines AP_Int32S
 
 // declare an array type
 // _t is the base type

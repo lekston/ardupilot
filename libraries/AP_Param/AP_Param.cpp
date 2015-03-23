@@ -23,7 +23,6 @@
 /// @file   AP_Param.cpp
 /// @brief  The AP variable store.
 
-
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Common/AP_Common.h>
 #include <AP_Math/AP_Math.h>
@@ -68,6 +67,7 @@ extern const AP_HAL::HAL &hal;
 
 // static member variables for AP_Param.
 //
+bool AP_Param::_p_unlock = false;
 
 // number of rows in the _var_info[] table
 uint8_t AP_Param::_num_vars;
@@ -219,6 +219,16 @@ bool AP_Param::check_var_info(void)
     return true;
 }
 
+bool AP_Param::check_params_unlocked()
+{
+    return _p_unlock;
+}
+
+void AP_Param::set_params_unlocked()
+{
+    hal.console->printf_P(PSTR("Warning: Params Unlocked!\n"));
+    _p_unlock = true;
+}
 
 // setup the _var_info[] table
 bool AP_Param::setup(void)
@@ -443,8 +453,10 @@ uint8_t AP_Param::type_size(enum ap_var_type type)
     case AP_PARAM_GROUP:
         return 0;
     case AP_PARAM_INT8:
+    case AP_PARAM_INT8_S:
         return 1;
     case AP_PARAM_INT16:
+    case AP_PARAM_INT16_S:
         return 2;
     case AP_PARAM_INT32:
     case AP_PARAM_INT32_S:
@@ -825,8 +837,14 @@ void AP_Param::set_value(enum ap_var_type type, void *ptr, float value)
     case AP_PARAM_INT8:
         ((AP_Int8 *)ptr)->set(value);
         break;
+    case AP_PARAM_INT8_S:
+        ((AP_Int8S *)ptr)->set(value);
+        break;
     case AP_PARAM_INT16:
         ((AP_Int16 *)ptr)->set(value);
+        break;
+    case AP_PARAM_INT16_S:
+        ((AP_Int16S *)ptr)->set(value);
         break;
     case AP_PARAM_INT32:
         ((AP_Int32 *)ptr)->set(value);
@@ -1089,8 +1107,10 @@ float AP_Param::cast_to_float(enum ap_var_type type) const
 {
     switch (type) {
     case AP_PARAM_INT8:
+    case AP_PARAM_INT8_S:
         return ((AP_Int8 *)this)->cast_to_float();
     case AP_PARAM_INT16:
+    case AP_PARAM_INT16_S:
         return ((AP_Int16 *)this)->cast_to_float();
     case AP_PARAM_INT32:
     case AP_PARAM_INT32_S:
@@ -1108,21 +1128,36 @@ float AP_Param::cast_to_float(enum ap_var_type type) const
 void AP_Param::show(const AP_Param *ap, const char *s,
                     enum ap_var_type type, AP_HAL::BetterStream *port)
 {
+    //only if unlocked
+    if (check_params_unlocked()) {
+        switch (type) {
+        case AP_PARAM_INT8:
+            port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int8 *)ap)->get());
+            break;
+        case AP_PARAM_INT16:
+            port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int16 *)ap)->get());
+            break;
+        case AP_PARAM_INT32:
+            port->printf_P(PSTR("%s: %ld\n"), s, (long)((AP_Int32 *)ap)->get());
+            break;
+        case AP_PARAM_FLOAT:
+            port->printf_P(PSTR("%s: %f\n"), s, (double)((AP_Float *)ap)->get());
+            break;
+        default:
+            break;
+        }
+    }
+
+    //always
     switch (type) {
-    case AP_PARAM_INT8:
-//        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int8 *)ap)->get());
+    case AP_PARAM_INT8_S:
+        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int8S *)ap)->get());
         break;
-    case AP_PARAM_INT16:
-//        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int16 *)ap)->get());
-        break;
-    case AP_PARAM_INT32:
-//        port->printf_P(PSTR("%s: %ld\n"), s, (long)((AP_Int32 *)ap)->get());
+    case AP_PARAM_INT16_S:
+        port->printf_P(PSTR("%s: %d\n"), s, (int)((AP_Int16S *)ap)->get());
         break;
     case AP_PARAM_INT32_S:
         port->printf_P(PSTR("%s: %ld\n"), s, (long)((AP_Int32S *)ap)->get());
-        break;
-    case AP_PARAM_FLOAT:
-//        port->printf_P(PSTR("%s: %f\n"), s, ((AP_Float *)ap)->get());
         break;
     case AP_PARAM_FLOAT_S:
         port->printf_P(PSTR("%s: %f\n"), s, (double)((AP_FloatS *)ap)->get());
@@ -1242,32 +1277,60 @@ void AP_Param::set_float(float value, enum ap_var_type var_type)
     // from float to integer to avoid truncating to the
     // next lower integer value.
     float rounding_addition = 0.01f;
-        
+
     // handle variables with standard type IDs
-    if (var_type == AP_PARAM_FLOAT) {
-        ((AP_Float *)this)->set(value);
-    } else if (var_type == AP_PARAM_FLOAT_S) {
-        ((AP_FloatS *)this)->set_and_save(packet.param_value);
-    } else if (var_type == AP_PARAM_INT32) {
-        if (value < 0) rounding_addition = -rounding_addition;
-        float v = value+rounding_addition;
-        v = constrain_float(v, -2147483648.0, 2147483647.0);
-        ((AP_Int32 *)this)->set(v);
-    } else if (var_type == AP_PARAM_INT32_S) {
-        if (packet.param_value < 0) rounding_addition = -rounding_addition;
-        float v = packet.param_value+rounding_addition;
-        v = constrain_float(v, -2147483648.0, 2147483647.0);
-        ((AP_Int32S *)this)->set_and_save(v);
-    } else if (var_type == AP_PARAM_INT16) {
-        if (value < 0) rounding_addition = -rounding_addition;
-        float v = value+rounding_addition;
-        v = constrain_float(v, -32768, 32767);
-        ((AP_Int16 *)this)->set(v);
-    } else if (var_type == AP_PARAM_INT8) {
+    if (check_params_unlocked()) {
+        switch(var_type) {
+        case AP_PARAM_INT8: {
+            if (value < 0) rounding_addition = -rounding_addition;
+            float v = value+rounding_addition;
+            v = constrain_float(v, -128, 127);
+            ((AP_Int8 *)this)->set_and_save(v);
+            break; }
+        case AP_PARAM_INT16: {
+            if (value < 0) rounding_addition = -rounding_addition;
+            float v = value+rounding_addition;
+            v = constrain_float(v, -32768, 32767);
+            ((AP_Int16 *)this)->set_and_save(v);
+            break; }
+        case AP_PARAM_INT32: {
+            if (value < 0) rounding_addition = -rounding_addition;
+            float v = value+rounding_addition;
+            v = constrain_float(v, -2147483648.0, 2147483647.0);
+            ((AP_Int32 *)this)->set_and_save(v);
+            break; }
+        case AP_PARAM_FLOAT: {
+            ((AP_Float *)this)->set_and_save(value);
+            break; }
+        default: {
+            break; }
+        }
+    }
+
+    switch(var_type) {
+    case AP_PARAM_INT8_S: {
         if (value < 0) rounding_addition = -rounding_addition;
         float v = value+rounding_addition;
         v = constrain_float(v, -128, 127);
-        ((AP_Int8 *)this)->set(v);
+        ((AP_Int8S *)this)->set_and_save(v);
+        break; }
+    case AP_PARAM_INT16_S: {
+        if (value < 0) rounding_addition = -rounding_addition;
+        float v = value+rounding_addition;
+        v = constrain_float(v, -32768, 32767);
+        ((AP_Int16S *)this)->set_and_save(v);
+        break; }
+    case AP_PARAM_INT32_S: {
+        if (value < 0) rounding_addition = -rounding_addition;
+        float v = value+rounding_addition;
+        v = constrain_float(v, -2147483648.0, 2147483647.0);
+        ((AP_Int32S *)this)->set_and_save(v);
+        break; }
+    case AP_PARAM_FLOAT_S: {
+        ((AP_FloatS *)this)->set_and_save(value);
+        break; }
+    default: {
+        break; }
     }
 }
 

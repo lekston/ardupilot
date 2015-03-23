@@ -76,9 +76,18 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] PROGMEM = {
     { SCHED_TASK(terrain_update),         5,    500 },
 };
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+void Plane::setup(bool unlock_params)
+#else
 void Plane::setup() 
+#endif
 {
     cliSerial = hal.console;
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    if (unlock_params) AP_Param::set_params_unlocked();
+#else
+    AP_Param::set_params_unlocked();
+#endif
 
     // load the default values of variables listed in var_info[]
     AP_Param::setup_sketch_defaults();
@@ -1018,13 +1027,24 @@ void Plane::update_optical_flow(void)
 /*
   compatibility with old pde style build
  */
-void setup(void);
 void loop(void);
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+void setup(bool unlock_params);
+
+void setup(bool unlock_params)
+{
+    plane.setup(unlock_params);
+}
+#else
+void setup(void);
 
 void setup(void)
 {
     plane.setup();
 }
+#endif
+
 void loop(void)
 {
     plane.loop();
