@@ -58,6 +58,11 @@ public:
         }
     }
 
+    bool lost_loiter_target(void) { return _maintaining_loiter && !_WPcircle; }
+
+    // used to ensure correct behaviour in case of two (or more subsequent loiters)
+    void reset_maintaining_loiter(void) { _maintaining_loiter = false; }
+
 	// this supports the NAVl1_* user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -100,6 +105,8 @@ private:
 
     // prevent indecision in waypoint tracking
     void _prevent_indecision(float &Nu);
+
+    bool _maintaining_loiter;
 };
 
 

@@ -478,6 +478,9 @@ private:
     // this controls throttle suppression in auto modes
     bool throttle_suppressed;
 
+    // true when loiter target has been lost in descent and should be intercepted again
+    bool need_safe_loiter_reentry;
+
     AP_SpdHgtControl::FlightStage flight_stage = AP_SpdHgtControl::FLIGHT_NORMAL;
 
     // probability of aircraft is currently in flight. range from 0 to

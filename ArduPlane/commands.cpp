@@ -67,6 +67,7 @@ void Plane::set_next_WP(const struct Location &loc)
     setup_turn_angle();
 
     loiter_angle_reset();
+    nav_controller->reset_maintaining_loiter();
 }
 
 void Plane::set_guided_WP(void)
@@ -94,6 +95,8 @@ void Plane::set_guided_WP(void)
     setup_turn_angle();
 
     loiter_angle_reset();
+
+    nav_controller->reset_maintaining_loiter();
 }
 
 // run this at setup on the ground

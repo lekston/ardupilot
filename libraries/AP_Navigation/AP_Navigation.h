@@ -102,6 +102,9 @@ public:
 	// the update_loiter() method is used
 	virtual bool reached_loiter_target(void) = 0;
 
+    virtual bool lost_loiter_target(void) = 0;
+    virtual void reset_maintaining_loiter(void) = 0;
+
 	// add new navigation controllers to this enum. Users can then
 	// select which navigation controller to use by setting the
 	// NAV_CONTROLLER parameter
