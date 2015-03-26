@@ -30,12 +30,11 @@ const AP_Param::GroupInfo AP_YawController::var_info[] PROGMEM = {
 	// @Description: This is the gain from measured lateral acceleration to demanded yaw rate. It should be set to zero unless active control of sideslip is desired. This will only work effectively if there is enough fuselage side area to generate a measureable lateral acceleration when the model sideslips. Flying wings and most gliders cannot use this term. This term should only be adjusted after the basic yaw damper gain YAW2SRV_DAMP is tuned and the YAW2SRV_INT integrator gain has been set. Set this gain to zero if only yaw damping is required.
 	// @Range: 0 4
 	// @Increment: 0.25
-	AP_GROUPINFO("SLIP",    0, AP_YawController, _K_A,    0),
+	AP_GROUPINFO("SLIP",    0, AP_YawController, _K_A,    1),
 
 	// @Param: INT
-	// @DisplayName: Sideslip control integrator
-	// @Description: This is the integral gain from lateral acceleration error. This gain should only be non-zero if active control over sideslip is desired. If active control over sideslip is required then this can be set to 1.0 as a first try.
-	// @Range: 0 2
+	// @DisplayName: Yaw damper integrator
+	// @Description: This is the integral gain from yaw damper.
 	// @Increment: 0.25
 	AP_GROUPINFO("INT",    1, AP_YawController, _K_I,    0),
 
@@ -66,6 +65,21 @@ const AP_Param::GroupInfo AP_YawController::var_info[] PROGMEM = {
 	// @Increment: 1
 	// @User: Advanced
 	AP_GROUPINFO("IMAX",  5, AP_YawController, _imax,        1500),
+
+	// @Param: INT_A
+	// @DisplayName: Sidelsip control integrator
+	// @Description: This is the integral gain for lateral acceleration error. This gain should only be non-zero if active control over sideslip is desired. If active control over sideslip is required then this can be set to 1.0 as a first try.
+	// @Range: 0 2
+	// @Increment: 0.25
+	AP_GROUPINFO("INT_A",  6, AP_YawController, _K_I_A,    0),
+
+	// @Param: IMAX_A
+	// @DisplayName: Integrator limit
+	// @Description: This limits the number of centi-degrees of rudder over which the integrator will operate. At the default setting of 1500 centi-degrees, the integrator will be limited to +- 15 degrees of servo travel. The maximum servo deflection is +- 45 degrees, so the default value represents a 1/3rd of the total control throw which is adequate for most aircraft unless they are severely out of trim or have very limited rudder control effectiveness.
+	// @Range: 0 4500
+	// @Increment: 1
+	// @User: Advanced
+	AP_GROUPINFO("IMAX_A",  7, AP_YawController, _imax_A,  1500),
 
 	AP_GROUPEND
 };
@@ -133,14 +147,17 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 		//only integrate if airspeed above min value
 		if (aspeed > float(aspd_min))
 		{
-			// prevent the integrator from increasing if surface defln demand is above the upper limit
 			if (_last_out < -45) {
+                // prevent the integrator from decreasing if surface defln demand is below the lower limit
                 _integrator += max(integ_in * delta_time , 0);
+                _integrator_A += min(accel_y_out * delta_time , 0);
             } else if (_last_out > 45) {
-                // prevent the integrator from decreasing if surface defln demand  is below the lower limit
+                // prevent the integrator from increasing if surface defln demand is above the upper limit
                 _integrator += min(integ_in * delta_time , 0);
+                _integrator_A += max(accel_y_out * delta_time , 0);
 			} else {
                 _integrator += integ_in * delta_time;
+                _integrator_A += accel_y_out * delta_time;
             }
 		}
 	} else {
@@ -157,6 +174,7 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 
     // Constrain the integrator state
     _integrator = constrain_float(_integrator, -intLimScaled, intLimScaled);
+    _integrator_A = constrain_float(_integrator_A, -_imax_A, _imax_A);
 	
 	// Protect against increases to _K_D during in-flight tuning from creating large control transients
 	// due to stored integrator values
@@ -169,7 +187,7 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	// Save to last value before application of limiter so that integrator limiting
 	// can detect exceedance next frame
 	// Scale using inverse dynamic pressure (1/V^2)
-	_last_out =  (_K_D * (_integrator - rate_hp_out) - _K_A * accel_y_out ) * scaler * scaler;
+	_last_out =  (_K_D * (_integrator - rate_hp_out) - _K_A * accel_y_out - _K_I_A * _integrator_A) * scaler * scaler;
 
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);
@@ -178,4 +196,5 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 void AP_YawController::reset_I()
 {
 	_integrator = 0;
+    _integrator_A = 0;
 }

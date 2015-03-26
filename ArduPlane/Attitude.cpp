@@ -416,8 +416,10 @@ void Plane::calc_nav_yaw_coordinated(float speed_scaler)
     }
     steering_control.rudder = yawController.get_servo_out(speed_scaler, disable_integrator);
 
+    float kff_thr2rdr = ((float)throttle_percentage() - (float)aparm.throttle_cruise);
     // add in rudder mixing from roll
     steering_control.rudder += channel_roll->servo_out * g.kff_rudder_mix;
+    steering_control.rudder += kff_thr2rdr * 100 * g.kff_throttle_to_rudder;
     steering_control.rudder += rudder_input;
     steering_control.rudder = constrain_int16(steering_control.rudder, -4500, 4500);
 }
