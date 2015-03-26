@@ -53,6 +53,8 @@ public:
 							   float hgt_afe,
 							   float load_factor);
 
+	void force_current_alt(float hgt_afe);
+
 	// demanded throttle in percentage
 	// should return 0 to 100
 	int32_t get_throttle_demand(void) {return int32_t(_throttle_dem * 100.0f);}
