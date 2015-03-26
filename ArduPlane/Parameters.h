@@ -269,6 +269,7 @@ public:
         k_param_kff_pitch_to_throttle, // unused
         k_param_kff_throttle_to_pitch,
         k_param_scaling_speed,
+        k_param_kff_throttle_to_rudder, //PrL
 
         //
         // 210: flight modes
@@ -345,6 +346,7 @@ public:
     AP_Float kff_rudder_mix;
     AP_Float kff_pitch_to_throttle;
     AP_Float kff_throttle_to_pitch;
+    AP_Float kff_throttle_to_rudder;
     AP_Float ground_steer_alt;
     AP_Int16 ground_steer_dps;
     AP_Float stab_pitch_down;
