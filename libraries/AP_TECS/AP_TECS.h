@@ -109,6 +109,8 @@ public:
         _use_synthetic_airspeed = true;
     }
     
+	void force_current_alt(float hgt_afe);
+
     // this supports the TECS_* user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 

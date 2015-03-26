@@ -612,6 +612,9 @@ private:
     int8_t  throttle_watt_limit_min; // for reverse thrust
     uint32_t throttle_watt_limit_timer_ms;
 
+    // true when loiter target has been lost in descent and should be intercepted again
+    bool need_safe_loiter_reentry;
+
     AP_SpdHgtControl::FlightStage flight_stage = AP_SpdHgtControl::FLIGHT_NORMAL;
 
     // probability of aircraft is currently in flight. range from 0 to

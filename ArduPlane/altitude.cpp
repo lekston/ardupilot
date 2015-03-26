@@ -42,6 +42,22 @@ void Plane::adjust_altitude_target()
         // once we reach a loiter target then lock to the final
         // altitude target
         set_target_altitude_location(next_WP_loc);
+        need_safe_loiter_reentry = false;
+    } else if (nav_controller->lost_loiter_target()) {
+        // occasionaly loiter pattern is not followed well on descent 
+        // especially when the wind and increased airspeed carry the aircraft downwind 
+        // in this case it is best to stop descent until aircraft re-establishes its loiter
+        if (above_location_current(next_WP_loc)) {
+            // stop descending until reestablished in loiter
+            if (!need_safe_loiter_reentry) {
+                need_safe_loiter_reentry = true;
+                set_target_altitude_current();
+                SpdHgt_Controller->force_current_alt(relative_altitude());
+            }
+        } else {
+            // continue climbing (safer to do so even if loiter target was lost)
+            set_target_altitude_location(next_WP_loc);
+        }
     } else if (target_altitude.offset_cm != 0 && 
                !location_passed_point(current_loc, prev_WP_loc, next_WP_loc)) {
         // control climb/descent rate

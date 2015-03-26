@@ -1077,3 +1077,15 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
                                            (double)logging.SEB_delta,
                                            (double)load_factor);
 }
+
+void AP_TECS::force_current_alt(float hgt_afe)
+{
+    _hgt_dem            = hgt_afe;
+    _hgt_dem_in_old     = hgt_afe;
+    _hgt_dem_prev       = hgt_afe;
+    _hgt_dem_adj        = hgt_afe;
+    _hgt_dem_adj_last   = hgt_afe;
+    _hgt_rate_dem       = 0;
+
+    //XXX could also limit speed in here (or increase minimum pitch)
+}

@@ -279,6 +279,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 
     // Waypoint capture status is always false during waypoint following
     _WPcircle = false;
+    _maintaining_loiter = false;
 
     _bearing_error = Nu; // bearing error angle (radians), +ve to left of track
 
@@ -390,6 +391,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     } else {
         _latAccDem = latAccDemCirc;
         _WPcircle = true;
+        _maintaining_loiter = true;
         _bearing_error = 0.0f; // bearing error (radians), +ve to left of track
         _nav_bearing = atan2f(-A_air_unit.y , -A_air_unit.x); // bearing (radians)from AC to L1 point
     }
