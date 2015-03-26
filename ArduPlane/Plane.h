@@ -572,6 +572,9 @@ private:
 
     AP_Vehicle::FixedWing::FlightStage flight_stage = AP_Vehicle::FixedWing::FLIGHT_NORMAL;
 
+    // true when loiter target has been lost in descent and should be intercepted again
+    bool need_safe_loiter_reentry;
+
     // probability of aircraft is currently in flight. range from 0 to
     // 1 where 1 is 100% sure we're in flight
     float isFlyingProbability;

@@ -66,6 +66,7 @@ void Plane::set_next_WP(const struct Location &loc)
     setup_turn_angle();
 
     loiter_angle_reset();
+    nav_controller->reset_maintaining_loiter();
 }
 
 void Plane::set_guided_WP(void)
@@ -101,6 +102,8 @@ void Plane::set_guided_WP(void)
     auto_state.vtol_loiter = false;
     
     loiter_angle_reset();
+
+    nav_controller->reset_maintaining_loiter();
 }
 
 /*
