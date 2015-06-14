@@ -117,67 +117,57 @@ set HAVE_PX4IO false
 if px4io start norc
 then
     set HAVE_PX4IO true
-else
-    # it may be in bootloader mode
-    echo Loading /etc/px4io/px4io.bin
-    tone_alarm MBABGP
-    if px4io update /etc/px4io/px4io.bin
-    then
-	echo "upgraded PX4IO firmware OK"
-        tone_alarm MSPAA
-    else
-	echo "Failed to upgrade PX4IO firmware"
-        tone_alarm MNGGG
-    fi
-    sleep 1
-    if px4io start norc
-    then
-        set HAVE_PX4IO true
-        # play happy tune again
-	tone_alarm 1
-    fi
+#else
+#    # it may be in bootloader mode
+#    echo Loading /etc/px4io/px4io.bin
+#    tone_alarm MBABGP
+#    if px4io update /etc/px4io/px4io.bin
+#    then
+#	echo "upgraded PX4IO firmware OK"
+#        tone_alarm MSPAA
+#    else
+#	echo "Failed to upgrade PX4IO firmware"
+#        tone_alarm MNGGG
+#    fi
+#    sleep 1
+#    if px4io start norc
+#    then
+#        set HAVE_PX4IO true
+#        # play happy tune again
+#	tone_alarm start
+#    fi
 fi
 
 if [ $HAVE_PX4IO == true ]
 then
     echo "PX4IO board OK"
-    if px4io checkcrc /etc/px4io/px4io.bin
-    then
-        echo "PX4IO CRC OK"
-    else
-        echo "PX4IO CRC failure"
-        echo "PX4IO CRC failure" >> $logfile    
-        tone_alarm MBABGP
-
-        if px4io safety_on
-        then
-            echo "PX4IO disarm OK"
-        else
-            echo "PX4IO disarm failed"
-        fi
-
-        sleep 1
-
-        if px4io forceupdate 14662 /etc/px4io/px4io.bin
-        then
-               sleep 1
-               if px4io start norc
-               then
-                  echo "PX4IO restart OK"
-                  echo "PX4IO restart OK" >> $logfile    
-                  tone_alarm MSPAA
-               else
-                  echo "PX4IO restart failed"
-                  echo "PX4IO restart failed" >> $logfile    
-                  tone_alarm MNGGG
-                  sh /etc/init.d/rc.error
-               fi
-        else
-               echo "PX4IO update failed"
-               echo "PX4IO update failed" >> $logfile    
-               tone_alarm MNGGG
-        fi
-    fi
+#    if px4io checkcrc /etc/px4io/px4io.bin
+#    then
+#        echo "PX4IO CRC OK"
+#    else
+#        echo "PX4IO CRC failure"
+#        echo "PX4IO CRC failure" >> $logfile    
+#        tone_alarm MBABGP
+#        if px4io forceupdate 14662 /etc/px4io/px4io.bin
+#        then
+#               sleep 1
+#               if px4io start norc
+#               then
+#                  echo "PX4IO restart OK"
+#                  echo "PX4IO restart OK" >> $logfile    
+#                  tone_alarm MSPAA
+#               else
+#                  echo "PX4IO restart failed"
+#                  echo "PX4IO restart failed" >> $logfile    
+#                  tone_alarm MNGGG
+#                  sh /etc/init.d/rc.error
+#               fi
+#        else
+#               echo "PX4IO update failed"
+#               echo "PX4IO update failed" >> $logfile    
+#               tone_alarm MNGGG
+#        fi
+#    fi
 else
     echo "No PX4IO board found"
     echo "No PX4IO board found" >> $logfile
@@ -222,14 +212,21 @@ fi
 if [ $BOARD == FMUv1 ]
 then
     echo "Starting FMUv1 sensors"
-    if hmc5883 -C -T start
+
+    if hmc5883 -C -X -T start
     then
-        echo "hmc5883 started OK"
+        echo "Have external hmc5883"
     else
-        echo "hmc5883 start failed"
-        echo "hmc5883 start failed" >> $logfile
-        sh /etc/init.d/rc.error
+        echo "No external hmc5883"
     fi
+
+    if hmc5883 -C -I start
+    then
+        echo "Have internal hmc5883"
+    else
+        echo "No internal hmc5883"
+    fi
+
     if mpu6000 start
     then
        echo "mpu6000  started OK"
@@ -421,6 +418,12 @@ then
     echo "failed to test mtd" >> $logfile
     sh /etc/init.d/rc.error           
   fi
+fi
+
+if [ -f /fs/microsd/etc/mixers/FMU_AETR.mix -a $HAVE_PX4IO == true ]
+then
+       echo "Loading mixer to PX4IO"
+       mixer load /dev/px4io /fs/microsd/etc/mixers/FMU_AETR.mix
 fi
 
 echo Starting ArduPilot $deviceA $deviceC $deviceD
