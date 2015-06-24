@@ -517,9 +517,11 @@ void Plane::handle_auto_mode(void)
         calc_throttle();
         
         if (auto_state.land_complete) {
-            // we are in the final stage of a landing - force
-            // zero throttle
-            channel_throttle->servo_out = 0;
+            // we are in the final stage of a landing
+            // decrease airspeed halfway down between V_at and V_min
+            // maintain glide slope
+            // disable MIN_GNDSPEED
+
         }
         break;
         
