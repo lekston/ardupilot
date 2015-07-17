@@ -810,7 +810,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         _PITCHminf = max(_PITCHminf, aparm.land_pitch_cd * 0.01f);
 
         // and use max pitch from TECS_LAND_PMAX
-        if (_land_pitch_max > 0) {
+        if (_land_pitch_max > aparm.land_pitch_cd * 0.01f) {
             _PITCHmaxf = min(_PITCHmaxf, _land_pitch_max);
         }
         
