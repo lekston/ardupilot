@@ -3,6 +3,8 @@
 
 extern const AP_HAL::HAL& hal;
 
+//#define DEBUG_UNDERSPEED_PROT
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <stdio.h>
 # define Debug(fmt, args ...)  do {printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__, ## args); hal.scheduler->delay(1); } while(0)
@@ -239,6 +241,25 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SYNAIRSPEED", 27, AP_TECS, _use_synthetic_airspeed, 0),
     
+    // @DisplayName: UnderSpeed Jerk Gain
+    // @Range: 0.1 0.5
+    // @Increment: 0.05
+    // @User: Advanced
+    AP_GROUPINFO("US_JERK_KP", 28, AP_TECS, _us_energy_jerk, 2.0f),
+
+    // @Param: OPT_BITMASK
+    // @DisplayName: Control options Bitmask
+    // @Values: 0: Disabled, 1: , 2: , 4: , 8: , 16: , 32: , 64:
+    // @Bitmask:
+    // @User: Advanced
+    AP_GROUPINFO("OPT_BITMASK", 29, AP_TECS, _opt_bitmask, USE_OPT_BITMASK_DEFAULT),
+
+    // @Range: 1 20
+    // @Increment: 1
+    // @Description: max time for underspeed recovery fadeout (DT * second)
+    // @User: Advanced
+    AP_GROUPINFO("US_FADETIME", 30, AP_TECS, _us_fade_time_max, 5),
+
     AP_GROUPEND
 };
 
@@ -352,10 +373,20 @@ void AP_TECS::_update_speed(float load_factor)
     }
 
     if (_TASmax < _TASmin) {
-        _TASmax = _TASmin;
+        _TASmax = _TASmin + 2.0f;
     }
-    if (_TASmin > _TAS_dem) {
-        _TASmin = _TAS_dem;
+
+    if (load_factor < 1.03)
+    { // corresponds to a bank demand of 20deg or less
+        if (_TASmin + 1.0f > _TAS_dem) {
+            _TAS_dem = _TASmin + 1.0f;
+        }
+    }
+    else
+    { // doing tight turns
+        if ((_TASmin + 2.0f*load_factor) > _TAS_dem) {
+            _TAS_dem = _TASmin + 2.0f*load_factor;
+        }
     }
 
     // Reset states of time since last update is too large
@@ -398,9 +429,22 @@ void AP_TECS::_update_speed_demand(void)
     // This will minimise the rate of descent resulting from an engine failure,
     // enable the maximum climb rate to be achieved and prevent continued full power descent
     // into the ground due to an unachievable airspeed value
-    if ((_flags.badDescent) || (_flags.underspeed))
+
+    if (_flags.badDescent) {
+        _TAS_dem     = 1.15 * _TASmin;
+    }
+    else if (_flags.underspeed)
     {
-        _TAS_dem     = _TASmin;
+        float _TASsafe = (1.15 * _TASmin) > (_TASmin + 2.0f) ? \
+                                            (1.15 * _TASmin) : \
+                                            (_TASmin + 2.0f) ;
+
+        //_TASmin increases with load_factor so no need to adjust it here
+
+        if (_TAS_dem < _TASsafe)
+        {
+            _TAS_dem = _TASsafe;
+        }
     }
 
     // Constrain speed demand, taking into account the load factor
@@ -409,7 +453,9 @@ void AP_TECS::_update_speed_demand(void)
     // calculate velocity rate limits based on physical performance limits
     // provision to use a different rate limit if bad descent or underspeed condition exists
     // Use 50% of maximum energy rate to allow margin for total energy contgroller
-    const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
+
+    float coeff = (_flags.underspeed ? 1.0f : 0.5f);
+    const float velRateMax = coeff * _STEdot_max / _TAS_state;
     const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
     const float TAS_dem_previous = _TAS_dem_adj;
 
@@ -501,7 +547,7 @@ void AP_TECS::_update_height_demand(void)
     float new_hgt_dem = _hgt_dem_adj;
     if (_flags.is_doing_auto_land) {
         if (hgt_dem_lag_filter_slew < 1) {
-            hgt_dem_lag_filter_slew += 0.1f; // increment at 10Hz to gradually apply the compensation at first
+            hgt_dem_lag_filter_slew += 0.04f; // increment at 10Hz to gradually apply the compensation at first
         } else {
             hgt_dem_lag_filter_slew = 1;
         }
@@ -513,37 +559,101 @@ void AP_TECS::_update_height_demand(void)
     _hgt_dem_adj = new_hgt_dem;
 }
 
+/* Extended underspeed protection targeting the following use cases:
+ *  - ensure immediate correction of unsafe airspeed
+ *  - continue recovery from underspeed until safe airspeed is achieved
+ *  - ensure that emergency glide is initiated in case of engine failure
+ *  - smoothen the transition back to the normal flight regime (fade-out underspeed)
+ *
+ */
 void AP_TECS::_detect_underspeed(void)
 {
-    // see if we can clear a previous underspeed condition. We clear
-    // it if we are now more than 15% above min speed, and haven't
-    // been below min speed for at least 3 seconds.
-    if (_flags.underspeed &&
-        _TAS_state >= _TASmin * 1.15f &&
-        AP_HAL::millis() - _underspeed_start_ms > 3000U) {
-        _flags.underspeed = false;
+    bool slowing_down = false;
+
+    float STEdot = _SPEdot + _SKEdot;
+    float throttle_damp = (_flags.is_doing_auto_land && !is_zero(_land_throttle_damp)) ?
+                           _land_throttle_damp :
+                           _thrDamp;
+
+    bool energy_OK_or_increasing = ((_STE_error + _STEdotErrLast * throttle_damp < 0) ||
+                ( (STEdot > 0) && ( (_height + 1.0f * _climb_rate) > _hgt_dem_adj) ));
+                /* lead height by 1sec of climb rate*/
+
+    if (_vel_dot <= 0.1) {  // some very low acceleration
+        _deceleration_counter++;
+        if (_deceleration_counter > 5) {
+            /* runs at 10Hz so underspeed protection trigger is more likely
+             * after at least 0.5 sec of continuous deceleration
+             */
+            slowing_down = true;
+        }
+    } else {
+        _deceleration_counter = 0;
     }
 
     if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_VTOL) {
         _flags.underspeed = false;
-    } else if (((_TAS_state < _TASmin * 0.9f) &&
-            (_throttle_dem >= _THRmaxf * 0.95f) &&
-            !_landing.is_flaring()) ||
-            ((_height < _hgt_dem_adj) && _flags.underspeed))
+    } else if ( ((_TAS_state < _TASmin * 1.01f) ||
+                ((_TAS_state < _TASmin * 1.05f) && (slowing_down))) &&
+                (!_landing.is_flaring()) )
     {
-        _flags.underspeed = true;
-        if (_TAS_state < _TASmin * 0.9f) {
+        if (!_flags.underspeed)
+        {
+            // this is the rising edge (protection just activated)
+            _flags.us_triggered = true;
             // reset start time as we are still underspeed
             _underspeed_start_ms = AP_HAL::millis();
+
+            // Causes:
+            // 1. large total energy error (low & slow)
+            // 2. V_min increased due load factor -> TODO just report UNDERSPEED to owner
+        }
+
+        _flags.underspeed = true;
+        _us_fadeout = _us_fade_time_max;
+    }
+    else if ( ( (_TAS_state >= _TAS_dem * 0.97f) &&
+                (_TAS_state >= _TASmin * 1.1f) &&
+                energy_OK_or_increasing ) ||
+              (_landing.is_flaring()) )
+    {
+        /* Condition to exit underspeed recovery are as follows:
+         *  - for general case is just TAS > 110% * TASmin or
+         *  - as soon as we enter the land final leg u/s detection is suspended.
+         */
+        if (_us_fadeout > 1) {
+            _us_fadeout--;
+#ifdef DEBUG_UNDERSPEED_PROT
+            hal.console->printf(".");
+#endif
+        } else if (_us_fadeout == 1) {
+            /* In case of engine failure XXX TAS_dem will be reached as we enter glide,
+             * but to ensure that we keep gliding the "energy_OK_or_increasing" flags considers
+             *  1. in updrafts STEdot will be positive
+             *  2. if USER diverts airplane to a WPT beneath:
+             *      >_STE_error may become negative
+             *      > (_height > _hgt_dem_adj) will become true
+             * Both 1 & 2 could cause early exit in case of from u/s protection
+             */
+            _us_fadeout = 0;
+            _flags.us_triggered = true;
+            _flags.underspeed = false;
+            // this is the falling edge (u/s recovery just dectivated)
+        } else {
+            _us_fadeout = 0;
+            _flags.us_triggered = false;
+            _flags.underspeed = false;
         }
     }
-    else
-    {
-        // this clears underspeed if we reach our demanded height and
-        // we are either below 95% throttle or we above 90% of min
-        // airspeed
-        _flags.underspeed = false;
+
+#ifdef DEBUG_UNDERSPEED_PROT
+    if (_flags.underspeed && _flags.us_triggered) {
+        hal.console->printf("U/S prot Activ at %.02f m/s\n", _TAS_state);
+    } else if (!_flags.underspeed && _flags.us_triggered) {
+        hal.console->printf("U/S prot Deactiv at %.02f m/s\n", _TAS_state);
     }
+    _flags.us_triggered = false;
+#endif
 }
 
 void AP_TECS::_update_energies(void)
@@ -612,13 +722,9 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     _STEdotErrLast = STEdot_error;
 
     // Calculate throttle demand
-    // If underspeed condition is set, then demand full throttle
-    if (_flags.underspeed)
-    {
-        _throttle_dem = 1.0f;
-    }
-    else
-    {
+
+        // tabulation to keep git readable
+
         // Calculate gain scaler from specific energy error to throttle
         // (_STEdot_max - _STEdot_min) / (_THRmaxf - _THRminf) is the derivative of STEdot wrt throttle measured across the max allowed throttle range.
         float K_STE2Thr = 1 / (timeConstant() * (_STEdot_max - _STEdot_min) / (_THRmaxf - _THRminf));
@@ -657,16 +763,34 @@ void AP_TECS::_update_throttle_with_airspeed(void)
             _last_throttle_dem = _throttle_dem;
         }
 
+        // Anti-windup protection
+        float _STE_err2integrator = _STE_error;
+        if ((bool)(_opt_bitmask & USE_OPT_BITMASK_ANTI_WINDUP_1))
+        if (_STE_error * STEdot_error < 0.0f) { // XXX what about the integTHR_state value??
+            // when err & dot_err are of opposite sign we are approaching the setpoint
+            // use SETdot_error to reduce the growth of absolute integrator value
+            _STE_err2integrator = _STE_error + STEdot_error * throttle_damp;
+        }
+
+        if ((bool)(_opt_bitmask & USE_OPT_BITMASK_ANTI_WINDUP_2))
+        if ((_STE_error * STEdot_error > 0.0f) && (_STE_error*_integTHR_state < 0.0f))
+        {
+            //moving away and the integrator pulls even further
+            _STE_err2integrator = 10.0f * _STE_error; // correct the integ error fast
+
+        }
+
+        // Calculate integrator state, constraining state
+        // Set integrator to a max throttle value during climbout
+        _integTHR_state += (_STE_err2integrator * _get_i_gain()) * _DT * K_STE2Thr;
+
         // Calculate integrator state upper and lower limits
         // Set to a value that will allow 0.1 (10%) throttle saturation to allow for noise on the demand
         // Additionally constrain the integrator state amplitude so that the integrator comes off limits faster.
         float maxAmp = 0.5f*(_THRmaxf - THRminf_clipped_to_zero);
         float integ_max = constrain_float((_THRmaxf - _throttle_dem + 0.1f),-maxAmp,maxAmp);
-        float integ_min = constrain_float((_THRminf - _throttle_dem - 0.1f),-maxAmp,maxAmp);
+        float integ_min = constrain_float((_THRminf - _throttle_dem),-maxAmp,maxAmp);
 
-        // Calculate integrator state, constraining state
-        // Set integrator to a max throttle value during climbout
-        _integTHR_state = _integTHR_state + (_STE_error * _get_i_gain()) * _DT * K_STE2Thr;
         if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
         {
             if (!_flags.reached_speed_takeoff) {
@@ -680,9 +804,57 @@ void AP_TECS::_update_throttle_with_airspeed(void)
             _integTHR_state = constrain_float(_integTHR_state, integ_min, integ_max);
         }
 
+        // If underspeed condition is triggered rapidly increase throttle
+        if (_flags.underspeed && _flags.us_triggered)
+        {
+            float _integTHR_shortage = (integ_max - 0.1f) - _integTHR_state;
+
+            if (_integTHR_shortage > 0.0f) {
+                if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND &&
+                    !_landing.is_flaring()) // u/s not active on flare
+                {
+                    // underspeed condition occured during approach
+                    // we are most likely only slightly below so add less thr
+                    if ((bool)(_opt_bitmask & USE_OPT_BITMASK_US_THROTTLE_JERK_MODE_L))
+                    {   // us_protection jerk with 1st order inertial response
+                        _integTHR_state += 0.5f * _integTHR_shortage;
+                    }
+                    else
+                    {   // us_protection jerk with energy error derived response
+                        // adding increment corresponding to demanded increase of energy
+
+                        _integTHR_state += _us_energy_jerk \
+                                      * (_STE_error + STEdot_error * throttle_damp) \
+                                      * K_STE2Thr;
+                        // XXX typically pulling in the right direction, but what if not??
+                    }
+                }
+                else // underspeed condition during normal flight
+                {
+                    // Causes:
+                    // 1. large total energy error (low & slow)
+                    // 2. V_min increased due load factor
+
+                    // for cause (1)
+                    if ((bool)(_opt_bitmask & USE_OPT_BITMASK_US_THROTTLE_JERK_MODE_N))
+                    {   // us_protection jerk with 1st order inertial response
+                        _integTHR_state += 0.5f * _integTHR_shortage;
+                    }
+                    else
+                    {
+                        //just set full throttle on U/S entry trigger
+                        _integTHR_state = integ_max - 0.1f; // -0.1f to avoid saturation
+                    }
+                    // (TODO check load_factor)
+                    // for cause (2) -> may actually be above
+                }
+            }
+        }
+
         // Sum the components.
         _throttle_dem = _throttle_dem + _integTHR_state;
-    }
+
+        // tabulation to keep git readable
 
     // Constrain throttle demand
     _throttle_dem = constrain_float(_throttle_dem, _THRminf, _THRmaxf);
@@ -788,9 +960,14 @@ void AP_TECS::_update_pitch(void)
         // height. This is needed as the usual relationship of speed
         // and height is broken by the VTOL motors
         SKE_weighting = 0.0f;        
-    } else if ( _flags.underspeed || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
+    } else if ( _flags.underspeed || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF ||
+                _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
+
         SKE_weighting = 2.0f;
+        _lastSKE_weighting = 2.0f;
+
     } else if (_flags.is_doing_auto_land) {
+
         if (_spdWeightLand < 0) {
             // use sliding scale from normal weight down to zero at landing
             float scaled_weight = _spdWeight * (1.0f - constrain_float(_path_proportion,0,1));
@@ -800,8 +977,11 @@ void AP_TECS::_update_pitch(void)
         }
     }
 
+    SKE_weighting = 0.8f * _lastSKE_weighting + 0.2f * SKE_weighting; // after 4sec LP err=0
+    _lastSKE_weighting = SKE_weighting;
+
     logging.SKE_weighting = SKE_weighting;
-    
+
     float SPE_weighting = 2.0f - SKE_weighting;
 
     // Calculate Specific Energy Balance demand, and error
@@ -812,17 +992,26 @@ void AP_TECS::_update_pitch(void)
 
     logging.SKE_error = _SKE_dem - _SKE_est;
     logging.SPE_error = _SPE_dem - _SPE_est;
-    
+
     // Calculate integrator state, constraining input if pitch limits are exceeded
+    // XXX this part is weird:
+    // - why do we use values of pitch (in radians) to constrain integrator input (in units of specific energy)
+    // - yet I believe this code is almost never used (perhaps only when changing the limits)
+    // - simplest correction would be to multiply radians by gainInv
     float integSEB_input = SEB_error * _get_i_gain();
+
+    _flags.using_integ_constr = false; // TODO check when is it ever used
     if (_pitch_dem > _PITCHmaxf)
     {
         integSEB_input = MIN(integSEB_input, _PITCHmaxf - _pitch_dem);
+        _flags.using_integ_constr = true;
     }
     else if (_pitch_dem < _PITCHminf)
     {
         integSEB_input = MAX(integSEB_input, _PITCHminf - _pitch_dem);
+        _flags.using_integ_constr = true;
     }
+
     float integSEB_delta = integSEB_input * _DT;
 
 #if 0
@@ -836,13 +1025,17 @@ void AP_TECS::_update_pitch(void)
 
     // Apply max and min values for integrator state that will allow for no more than
     // 5deg of saturation. This allows for some pitch variation due to gusts before the
-    // integrator is clipped. Otherwise the effectiveness of the integrator will be reduced in turbulence
-    // During climbout/takeoff, bias the demanded pitch angle so that zero speed error produces a pitch angle
-    // demand equal to the minimum value (which is )set by the mission plan during this mode). Otherwise the
+    // integrator is clipped.
+    // Otherwise the effectiveness of the integrator will be reduced in turbulence
+    // During climbout/takeoff, bias the demanded pitch angle so that zero
+    // speed error produces a pitch angle demand equal to the minimum value (which is)
+    // set by the mission plan during this mode). Otherwise the
     // integrator has to catch up before the nose can be raised to reduce speed during climbout.
     // During flare a different damping gain is used
     float gainInv = (_TAS_state * timeConstant() * GRAVITY_MSS);
-    float temp = SEB_error + SEBdot_dem * timeConstant();
+
+    // SEB PID: Proportional and FF Components
+    float SEB_PDFF_temp = SEB_error + SEBdot_dem * timeConstant();
 
     float pitch_damp = _ptchDamp;
     if (_landing.is_flaring()) {
@@ -850,21 +1043,52 @@ void AP_TECS::_update_pitch(void)
     } else if (!is_zero(_land_pitch_damp) && _flags.is_doing_auto_land) {
         pitch_damp = _land_pitch_damp;
     }
-    temp += SEBdot_error * pitch_damp;
 
-    if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
-        temp += _PITCHminf * gainInv;
+    SEB_PDFF_temp += SEBdot_error * pitch_damp; // SEB PID: Derivative Component
+
+    if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF ||
+        _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
+    {
+        SEB_PDFF_temp += _PITCHminf * gainInv; // SEB PID: pitch offset for Take-Off/Go-Around
     }
-    float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - temp;
-    float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - temp;
+
+    // Apply constraints on PDFF part of the Specific Energy Balance control
+    float SEB_PDFF_limited = constrain_float(SEB_PDFF_temp, gainInv * _PITCHminf, gainInv * _PITCHmaxf);
+
+    // Adjust pitch demand integrator on underspeed_trigger
+    // that is: Pitch down!
+    if (_flags.underspeed && _flags.us_triggered)
+    {
+        // the integration gains will ensure smooth return to normal flight
+        if (_flight_stage != AP_Vehicle::FixedWing::FLIGHT_TAKEOFF)
+        {
+            // compute the value of integration component that yields
+            // pitch_dem equal to _PITCHminf * 0.5f
+            float _integSEB_reset = _PITCHminf * 0.5f * gainInv - SEB_PDFF_limited;
+            // make sure u/spd reset does not increase the integrator
+            _integSEB_state = MIN(_integSEB_reset, _integSEB_state);
+        }
+        else
+        {
+            // ON TAKE-OFF
+            // compute the value of integration component that yields
+            // pitch_dem equal to land_pitch
+            float _integSEB_reset = radians(_landing.get_pitch_cd()) * gainInv - SEB_PDFF_limited;
+            // make sure u/spd reset does not increase the integrator
+            _integSEB_state = MIN(_integSEB_reset, _integSEB_state);
+        }
+    }
+
+    float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - SEB_PDFF_limited;
+    float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - SEB_PDFF_limited;
     float integSEB_range = integSEB_max - integSEB_min;
 
     logging.SEB_delta = integSEB_delta;
-    
+
     // don't allow the integrator to rise by more than 20% of its full
     // range in one step. This prevents single value glitches from
     // causing massive integrator changes. See Issue#4066
-    integSEB_delta = constrain_float(integSEB_delta, -integSEB_range*0.1f, integSEB_range*0.1f);
+    integSEB_delta = constrain_float(integSEB_delta, -integSEB_range*0.2f, integSEB_range*0.2f);
 
     // prevent the constraint on pitch integrator _integSEB_state from
     // itself injecting step changes in the variable. We only want the
@@ -879,7 +1103,7 @@ void AP_TECS::_update_pitch(void)
     _integSEB_state = constrain_float(_integSEB_state + integSEB_delta, integSEB_min, integSEB_max);
 
     // Calculate pitch demand from specific energy balance signals
-    _pitch_dem_unc = (temp + _integSEB_state) / gainInv;
+    _pitch_dem_unc = (SEB_PDFF_limited + _integSEB_state) / gainInv; // SEB Integration Component
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
@@ -912,6 +1136,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _integSEB_state      = 0.0f;
         _last_throttle_dem = aparm.throttle_cruise * 0.01f;
         _last_pitch_dem    = _ahrs.pitch;
+        _lastSKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
         _hgt_dem_adj_last  = hgt_afe;
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
@@ -933,10 +1158,11 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _flags.underspeed        = false;
         _flags.badDescent  = false;
     }
-    
-    if (_flight_stage != AP_Vehicle::FixedWing::FLIGHT_TAKEOFF && _flight_stage != AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
+
+    if (_flight_stage != AP_Vehicle::FixedWing::FLIGHT_TAKEOFF &&
+        _flight_stage != AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
         // reset takeoff speed flag when not in takeoff
-        _flags.reached_speed_takeoff = false;        
+        _flags.reached_speed_takeoff = false;
     }
 }
 
@@ -1044,7 +1270,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             _flags.reached_speed_takeoff = true;
         }
     }
-    
+
     // convert to radians
     _PITCHmaxf = radians(_PITCHmaxf);
     _PITCHminf = radians(_PITCHminf);

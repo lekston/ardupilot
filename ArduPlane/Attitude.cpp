@@ -712,10 +712,11 @@ void Plane::update_load_factor(void)
     }
        
 
-    float max_load_factor = smoothed_airspeed / MAX(aparm.airspeed_min, 1);
-    if (max_load_factor <= 1) {
-        // our airspeed is below the minimum airspeed. Limit roll to
-        // 25 degrees
+    float max_load_factor = smoothed_airspeed / (aparm.airspeed_min + 1.5f);
+    if ((max_load_factor <= 1) ||
+        (auto_throttle_mode && SpdHgt_Controller->get_underspeed())) {
+        // our airspeed is below the minimum airspeed or underspeed condition has been detected
+        // Limit roll to 25 degrees
         nav_roll_cd = constrain_int32(nav_roll_cd, -2500, 2500);
         roll_limit_cd = constrain_int32(roll_limit_cd, -2500, 2500);
     } else if (max_load_factor < aerodynamic_load_factor) {

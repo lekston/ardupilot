@@ -36,6 +36,7 @@ public:
         , _soaring_controller(soaring_controller)
     {
         AP_Param::setup_object_defaults(this, var_info);
+        _deceleration_counter = 0;
     }
 
     /* Do not allow copies */
@@ -118,8 +119,16 @@ public:
     void use_synthetic_airspeed(void) {
         _use_synthetic_airspeed_once = true;
     }
-    
-	void force_current_alt(float hgt_afe);
+
+    void force_current_alt(float hgt_afe);
+
+    bool get_underspeed(void) const {
+        /* higher level module should check if
+         * current consumption and battery levels are OK
+         */
+        // hal.console->printf("Low speed, check engine\n");
+        return _flags.underspeed;
+    }
 
     // this supports the TECS_* user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
@@ -173,10 +182,13 @@ private:
     AP_Int8  _pitch_min;
     AP_Int8  _land_pitch_max;
     AP_Float _maxSinkRate_approach;
+    AP_Float _us_energy_jerk;
+    AP_Int32 _opt_bitmask;
+    AP_Int8  _us_fade_time_max;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
-    
+
     // current height estimate (above field elevation)
     float _height;
 
@@ -254,6 +266,9 @@ private:
     // Total energy rate filter state
     float _STEdotErrLast;
 
+    // LP filter state of Specific Kinetic Energy weighting
+    float _lastSKE_weighting;
+
     struct flags {
         // Underspeed condition
         bool underspeed:1;
@@ -266,11 +281,19 @@ private:
 
         // true when we have reached target speed in takeoff
         bool reached_speed_takeoff:1;
+
+        // Underspeed event transition
+        bool us_triggered:1;
+
+        bool using_integ_constr:1;
     };
     union {
         struct flags _flags;
         uint8_t _flags_byte;
     };
+
+    // Underspeed transition
+    uint16_t _us_fadeout;
 
     // time when underspeed started
     uint32_t _underspeed_start_ms;
@@ -333,6 +356,9 @@ private:
     // use synthetic airspeed for next loop
     bool _use_synthetic_airspeed_once;
     
+    // helps to detect prolonged periods of deceleration
+    int32_t _deceleration_counter;
+
     // Update the airspeed internal state using a second order complementary filter
     void _update_speed(float load_factor);
 
@@ -375,3 +401,13 @@ private:
     // current time constant
     float timeConstant(void) const;
 };
+
+#define USE_OPT_BITMASK_DEFAULT                 0x00C0 // jerk inertial by default for all modes
+#define USE_OPT_BITMASK_ANTI_WINDUP_1           (1<<0)
+#define USE_OPT_BITMASK_ANTI_WINDUP_2           (1<<1)
+#define USE_OPT_BITMASK_US_THROTTLE_JERK_MODE_L (1<<2) // 0-1st order inertial / 1-energy based
+#define USE_OPT_BITMASK_US_THROTTLE_JERK_MODE_N (1<<3) // Normal flight
+
+#define USE_OPT_BITMASK_US_LOAD_FACTOR_CORR_1   (1<<4)
+#define USE_OPT_BITMASK_US_LOAD_FACTOR_CORR_2   (1<<5)
+
