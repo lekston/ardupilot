@@ -50,6 +50,8 @@ public:
 
 	virtual void force_current_alt(float) = 0;
 
+	virtual bool get_underspeed(void) const = 0;
+
 	// demanded throttle in percentage
 	// should return 0 to 100
 	virtual int32_t get_throttle_demand(void)=0;
