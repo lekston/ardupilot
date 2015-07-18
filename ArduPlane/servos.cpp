@@ -32,6 +32,13 @@ void Plane::throttle_slew_limit(SRV_Channel::Aux_servo_function_t func)
             slewrate = landing.get_throttle_slewrate();
         }
     }
+    // radicaly bump up slew rate when flying slow (faster response is essential)
+    if ( ahrs.airspeed_sensor_enabled() &&
+       ( (smoothed_airspeed <= 0.9 * SpdHgt_Controller->get_target_airspeed()) ||
+         (smoothed_airspeed <= 1.05* aparm.airspeed_min) )
+       ) {
+        slewrate *= 2;
+    }
     // if slew limit rate is set to zero then do not slew limit
     if (slewrate) {                   
         SRV_Channels::limit_slew_rate(func, slewrate, G_Dt);
