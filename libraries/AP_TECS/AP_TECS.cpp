@@ -288,7 +288,7 @@ void AP_TECS::_update_speed(float load_factor)
            (_flight_stage == FLIGHT_LAND_APPROACH || _flight_stage== FLIGHT_LAND_FINAL)) {
 		_TAS_dem = _landAirspeed * EAS2TAS;
 		if (_TASmin > _TAS_dem) {
-			_TASmin = _TAS_dem;
+			_TAS_dem = _TASmin;
 		}
     }
 
