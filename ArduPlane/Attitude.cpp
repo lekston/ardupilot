@@ -592,6 +592,13 @@ void Plane::throttle_slew_limit(int16_t last_throttle)
     if (slewrate) {                   
         // limit throttle change by the given percentage per second
         float temp = slewrate * G_Dt * 0.01f * fabsf(channel_throttle->get_radio_max() - channel_throttle->get_radio_min());
+        // radicaly bump up slew rate when flying slow (faster response is essential)
+        if ( ahrs.airspeed_sensor_enabled() && 
+           ( (smoothed_airspeed <= 0.9 * SpdHgt_Controller->get_target_airspeed()) || 
+             (smoothed_airspeed <= 1.05* aparm.airspeed_min) )
+           ) {
+            temp *= 2;
+        }
         // allow a minimum change of 1 PWM per cycle
         if (temp < 1) {
             temp = 1;
