@@ -36,6 +36,7 @@ public:
 		aparm(parms)
 		{
 			AP_Param::setup_object_defaults(this, var_info);
+			_deceleration_counter = 0;
 		}
 
 	// Update of the estimated height and height rate internal state
@@ -248,6 +249,9 @@ private:
 
 	// counter for demanded sink rate on land final
 	uint8_t _flare_counter;
+
+	// helps to detect prolonged periods of deceleration
+	int32_t _deceleration_counter;
 
     // Update the airspeed internal state using a second order complementary filter
     void _update_speed(float load_factor);
