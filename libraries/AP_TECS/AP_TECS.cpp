@@ -333,7 +333,7 @@ void AP_TECS::_update_speed_demand(void)
 	// into the ground due to an unachievable airspeed value
 	if ((_badDescent) || (_underspeed))
 	{
-		_TAS_dem     = _TASmin;
+		_TAS_dem     = _landAirspeed;
 	}
 	
     // Constrain speed demand, taking into account the load factor
@@ -435,10 +435,22 @@ void AP_TECS::_update_height_demand(void)
 
 void AP_TECS::_detect_underspeed(void) 
 {
-    if (((_integ5_state < _TASmin * 0.9f) && 
-		 (_throttle_dem >= _THRmaxf * 0.95f) &&
-		 _flight_stage != AP_TECS::FLIGHT_LAND_FINAL) || 
-		((_integ3_state < _hgt_dem_adj) && _underspeed))
+    bool slowing_down = false;
+
+    if (_vel_dot <= 0.0) {
+        _deceleration_counter++;
+        if (_deceleration_counter > 5) {
+            // runs at 10Hz so underspeed protection should be triggered after 0.5 sec
+            slowing_down = true;
+        }
+    } else {
+        _deceleration_counter = 0;
+    }
+
+    if ( ( ((_integ5_state < _TASmin * 0.95f) && (_throttle_dem >= _THRmaxf * 0.5f)) ||
+           ((_integ5_state < _TASmin * 1.1f) && (slowing_down)) ) &&
+		 (_flight_stage != AP_TECS::FLIGHT_LAND_FINAL) || 
+		 ((_integ3_state < _hgt_dem_adj) && _underspeed) )
     {
         _underspeed = true;
     }
