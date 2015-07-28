@@ -46,7 +46,7 @@
 #define LOG_RAW             DISABLED
 #define LOG_CMD             ENABLED
 #define LOG_CUR	            ENABLED
-#define LOG_CAMERA          ENABLED
+#define LOG_CAMERA          DISABLED
 
 //Usually mount defines are covered in AP_Mount.h
 //#define MOUNT          ENABLED
@@ -65,5 +65,5 @@
     #define CAMERA                      DISABLED
     //#define CLI_ENABLED               DISABLED
     #define MOUNT_RETRACT               DISABLED
-    #define GPS_PROTOCOL                GPS_PROTOCOL_UBLOX
+    #define MOUNT2                      DISABLED
 #endif
