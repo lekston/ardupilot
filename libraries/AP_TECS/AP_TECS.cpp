@@ -452,12 +452,30 @@ void AP_TECS::_detect_underspeed(void)
 		 (_flight_stage != AP_TECS::FLIGHT_LAND_FINAL) || 
 		 ((_integ3_state < _hgt_dem_adj) && _underspeed) )
     {
+        if (!_underspeed) {
+            // this is the rising edge (protection just activated)
+            _us_triggered = true;
+        } else {
+            _us_triggered = false;
+        }
         _underspeed = true;
-    }
-    else
-    {
+    } else {
+        if (_underspeed) {
+            // this is the falling edge (protection just activated)
+            _us_triggered = true;
+        } else {
+            _us_triggered = false;
+        }
         _underspeed = false;
     }
+
+#ifdef DEBUG_UNDERSPEED_PROT
+    if (_underspeed && _us_triggered) {
+        hal.console->printf(PSTR("U/S protection Activated at %.02f m/s"), _integ5_state);
+    } else if (!_underspeed && _us_triggered) {
+        hal.console->printf(PSTR("U/S protection Deactivated at %.02f m/s"), _integ5_state);
+    }
+#endif
 }
 
 void AP_TECS::_update_energies(void) 
