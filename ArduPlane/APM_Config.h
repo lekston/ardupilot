@@ -56,6 +56,8 @@
     #define SERIAL2_BAUD                   57600
 #endif
 
+#define DEBUG_UNDERSPEED_PROT
+
 //free some memory
 #if CONFIG_HAL_BOARD == HAL_BOARD_APM2
     #define GEOFENCE_ENABLED            DISABLED
