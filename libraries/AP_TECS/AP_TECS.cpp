@@ -5,6 +5,9 @@
 
 extern const AP_HAL::HAL& hal;
 
+#define US_FADE_TIME 10.0f //1sec (running at 10Hz) should allow for a smooth recovery
+//#define DEBUG_UNDERSPEED_PROT
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
  #include <stdio.h>
  # define Debug(fmt, args ...)  do {printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__, ## args); hal.scheduler->delay(1); } while(0)
@@ -331,9 +334,14 @@ void AP_TECS::_update_speed_demand(void)
 	// This will minimise the rate of descent resulting from an engine failure,
 	// enable the maximum climb rate to be achieved and prevent continued full power descent
 	// into the ground due to an unachievable airspeed value
-	if ((_badDescent) || (_underspeed))
+	if (_badDescent ) {
+		_TAS_dem     = 1.2 * _TASmin;
+	}
+	else if (_underspeed)
 	{
-		_TAS_dem     = _landAirspeed;
+        //phase-out the speed target
+		_TAS_dem     = 1.2 * _TASmin * _us_fadeout/US_FADE_TIME \
+                       + _TAS_dem * (US_FADE_TIME - _us_fadeout)/US_FADE_TIME;
 	}
 	
     // Constrain speed demand, taking into account the load factor
@@ -433,48 +441,73 @@ void AP_TECS::_update_height_demand(void)
     _hgt_dem_adj = new_hgt_dem;
 }
 
+/* Extended underspeed protection targeting the following use cases:
+ *  - ensure immediate correction of unsafe airspeed
+ *  - continue recovery from underspeed until safe airspeed is achieved
+ *  - ensure that emergency glide is initiated in case of engine failure
+ *  - smoothen the transition back to the normal flight regime (fade-out underspeed) 
+ *
+ */
 void AP_TECS::_detect_underspeed(void) 
 {
+    //add description of the logic
     bool slowing_down = false;
 
-    if (_vel_dot <= 0.0) {
+    if (_vel_dot <= 0.0 ) {
         _deceleration_counter++;
         if (_deceleration_counter > 5) {
-            // runs at 10Hz so underspeed protection should be triggered after 0.5 sec
+            /* runs at 10Hz so underspeed protection trigger is more likely
+             * after at least 0.5 sec of continuous deceleration
+             */
             slowing_down = true;
         }
     } else {
         _deceleration_counter = 0;
     }
 
-    if ( (( ((_integ5_state < _TASmin * 0.95f) && (_throttle_dem >= _THRmaxf * 0.5f)) ||
-           ((_integ5_state < _TASmin * 1.1f) && (slowing_down)) ) &&
-		  (_flight_stage != AP_TECS::FLIGHT_LAND_FINAL)) || 
-		 ((_integ3_state < _hgt_dem_adj) && _underspeed) )
+    if (( ( (_integ5_state < _TASmin * 0.95f) ||
+           ((_integ5_state < _TASmin * 1.05f ) && (slowing_down)) ) &&
+		  (_flight_stage != AP_TECS::FLIGHT_LAND_FINAL) ))
     {
-        if (!_underspeed) {
-            // this is the rising edge (protection just activated)
-            _us_triggered = true;
-        } else {
-            _us_triggered = false;
-        }
+        // this is the rising edge (protection just activated)
+        if (!_underspeed) _us_triggered = true;
+
         _underspeed = true;
-    } else {
-        if (_underspeed) {
-            // this is the falling edge (protection just activated)
-            _us_triggered = true;
+        _us_fadeout = US_FADE_TIME;
+    } 
+    else if ( (_integ5_state >= _TAS_dem) || (_flight_stage != AP_TECS::FLIGHT_LAND_FINAL) ||
+        ((_integ5_state >= _TASmin * 1.1) && (_flight_stage != AP_TECS::FLIGHT_LAND_APPROACH)) )
+    {
+        if (_us_fadeout > 1) {
+            _us_fadeout--;
+#ifdef DEBUG_UNDERSPEED_PROT
+            hal.console->printf(PSTR("."));
+#endif
+        } else if (_us_fadeout == 1) {
+            float STEdot = _SPEdot + _SKEdot;
+            if (STEdot < 0) {
+                //this seems to be an engine failure
+#ifdef DEBUG_UNDERSPEED_PROT
+                hal.console->printf(PSTR("No climb, check engine\n"));
+#endif
+            } else {
+                _us_fadeout = 0;
+                _us_triggered = true;
+                _underspeed = false;
+                            // this is the falling edge (protection just dectivated)
+            }
         } else {
-            _us_triggered = false;
+            _underspeed = false;
         }
-        _underspeed = false;
     }
 
 #ifdef DEBUG_UNDERSPEED_PROT
     if (_underspeed && _us_triggered) {
-        hal.console->printf(PSTR("U/S protection Activated at %.02f m/s"), _integ5_state);
+        hal.console->printf(PSTR("U/S prot Activ at %.02f m/s\n"), _integ5_state);
     } else if (!_underspeed && _us_triggered) {
-        hal.console->printf(PSTR("U/S protection Deactivated at %.02f m/s"), _integ5_state);
+        hal.console->printf(PSTR("U/S prot Deactiv at %.02f m/s\n"), _integ5_state);
     }
+    _us_triggered = false;
 #endif
 }
 
@@ -536,6 +569,8 @@ void AP_TECS::_update_throttle(void)
     // If underspeed condition is set, then demand full throttle
     if (_underspeed)
     {
+        // no phase-in/-out for the throttle demand as
+        // thr_max either ensures recovery or not (the latter implies engine failure)
         _throttle_dem = 1.0f;
     }
     else
@@ -676,7 +711,14 @@ void AP_TECS::_update_pitch(void)
     if (!_ahrs.airspeed_sensor_enabled()) {
 		SKE_weighting = 0.0f;
     } else if ( _underspeed || _flight_stage == AP_TECS::FLIGHT_TAKEOFF) {
-		SKE_weighting = 2.0f;
+        /* no phase-out here: if this results in STEdot < 0 at full thr 
+         * then we're most likely experiencing an engine failure. 
+         */
+        SKE_weighting = 2.0f;
+#if 0
+		SKE_weighting = 2.0f * _us_fadeout/US_FADE_TIME \
+                        + SKE_weighting * (US_FADE_TIME - _us_fadeout)/US_FADE_TIME;
+#endif
     } else if (_flight_stage == AP_TECS::FLIGHT_LAND_APPROACH || _flight_stage == AP_TECS::FLIGHT_LAND_FINAL) {
         SKE_weighting = constrain_float(_spdWeightLand, 0.0f, 2.0f);
     }
@@ -733,7 +775,15 @@ void AP_TECS::_update_pitch(void)
     _pitch_dem_unc = (temp + _integ7_state) / gainInv;
 
     // Constrain pitch demand
-    _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
+    if (_underspeed) 
+    //phase-out the upper limit
+    {
+        float pitchMax_weighted = aparm.land_pitch_cd * 0.01f * _us_fadeout/US_FADE_TIME \
+                                  + _PITCHmaxf * (US_FADE_TIME - _us_fadeout)/US_FADE_TIME;
+        _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, pitchMax_weighted);
+    } else {
+        _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
+    }
 
     // Rate limit the pitch demand to comply with specified vertical
     // acceleration limit

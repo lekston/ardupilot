@@ -210,8 +210,9 @@ private:
     // Underspeed condition
     bool _underspeed;
 
-	// Underspeed event transition
+	// Underspeed transition
 	bool _us_triggered;
+	uint16_t _us_fadeout;
 
     // Bad descent condition caused by unachievable airspeed demand
     bool _badDescent;
