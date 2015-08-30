@@ -414,7 +414,8 @@ void Plane::stabilize()
     if (channel_throttle->get_control_in() == 0 &&
         fabsf(relative_altitude) < 5.0f && 
         fabsf(barometer.get_climb_rate()) < 0.5f &&
-        gps.ground_speed() < 3) {
+        gps.ground_speed() < 3 &&
+        (flight_stage != AP_Vehicle::FixedWing::FLIGHT_LAND)) {
         // we are low, with no climb rate, and zero throttle, and very
         // low ground speed. Zero the attitude controller
         // integrators. This prevents integrator buildup pre-takeoff.
