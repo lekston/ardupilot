@@ -531,6 +531,22 @@ void Plane::handle_auto_mode(void)
     } else if (nav_cmd_id == MAV_CMD_NAV_LAND) {
         calc_nav_roll();
         calc_nav_pitch();
+
+        if (auto_state.wp_proportion > 0.5f) {
+            //Fade-In Roll limits
+            float fade_in_gain = (auto_state.wp_proportion - 0.5)*2.0f;
+            //auto_state.wp_proportion changes from 0 to 1 as we approach the landing spot 
+            //fade_in_gain changes from 0 to 1 as we approach the landing spot
+
+            float roll_limit_cd_loc = (1.0 - fade_in_gain) * roll_limit_cd + \
+                                      fade_in_gain * g.level_roll_limit * 100.0;
+
+            nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd_loc, roll_limit_cd_loc);
+
+#if 0 //PRINT DEBUG
+            hal.console->printf(PSTR("%f\n"), roll_limit_cd_loc);
+#endif
+        }
         
         if (auto_state.land_complete) {
             // during final approach constrain roll to the range
