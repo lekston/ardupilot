@@ -503,7 +503,7 @@ void Plane::handle_auto_mode(void)
         calc_nav_roll();
         calc_nav_pitch();
         
-        if (auto_state.land_complete) {
+        if (auto_state.land_complete || (auto_state.wp_proportion > 0.5)) {
             // during final approach constrain roll to the range
             // allowed for level flight
             nav_roll_cd = constrain_int32(nav_roll_cd, -g.level_roll_limit*100UL, g.level_roll_limit*100UL);
