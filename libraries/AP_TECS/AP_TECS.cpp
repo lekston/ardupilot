@@ -335,12 +335,12 @@ void AP_TECS::_update_speed_demand(void)
 	// enable the maximum climb rate to be achieved and prevent continued full power descent
 	// into the ground due to an unachievable airspeed value
 	if (_badDescent ) {
-		_TAS_dem     = 1.2 * _TASmin;
+		_TAS_dem     = 1.1 * _TASmin;
 	}
 	else if (_underspeed)
 	{
         //phase-out the speed target
-		_TAS_dem     = 1.2 * _TASmin * _us_fadeout/US_FADE_TIME \
+		_TAS_dem     = 1.1 * _TASmin * _us_fadeout/US_FADE_TIME \
                        + _TAS_dem * (US_FADE_TIME - _us_fadeout)/US_FADE_TIME;
 	}
 	
@@ -466,7 +466,7 @@ void AP_TECS::_detect_underspeed(void)
     }
 
     if (( ( (_integ5_state < _TASmin * 0.95f) ||
-           ((_integ5_state < _TASmin * 1.05f ) && (slowing_down)) ) &&
+           ((_integ5_state <= _TASmin * 1.00f ) && (slowing_down)) ) &&
 		  (_flight_stage != AP_TECS::FLIGHT_LAND_FINAL) ))
     {
         // this is the rising edge (protection just activated)
@@ -476,7 +476,7 @@ void AP_TECS::_detect_underspeed(void)
         _us_fadeout = US_FADE_TIME;
     } 
     else if ( (_integ5_state >= _TAS_dem) || (_flight_stage != AP_TECS::FLIGHT_LAND_FINAL) ||
-        ((_integ5_state >= _TASmin * 1.1) && (_flight_stage != AP_TECS::FLIGHT_LAND_APPROACH)) )
+        ((_integ5_state >= _TASmin * 1.05) && (_flight_stage != AP_TECS::FLIGHT_LAND_APPROACH)) )
     {
         if (_us_fadeout > 1) {
             _us_fadeout--;
@@ -572,6 +572,14 @@ void AP_TECS::_update_throttle(void)
         // no phase-in/-out for the throttle demand as
         // thr_max either ensures recovery or not (the latter implies engine failure)
         _throttle_dem = 1.0f;
+
+        if (_flight_stage == AP_TECS::FLIGHT_LAND_APPROACH \
+            || _flight_stage == AP_TECS::FLIGHT_LAND_FINAL) {
+            //we should be descending add less
+            _throttle_dem = 0.5f;
+            //TODO consider gusts and downdrafts (Potential Energy Err < 0)
+        }
+
     }
     else
     {
@@ -778,9 +786,19 @@ void AP_TECS::_update_pitch(void)
     if (_underspeed) 
     //phase-out the upper limit
     {
-        float pitchMax_weighted = aparm.land_pitch_cd * 0.01f * _us_fadeout/US_FADE_TIME \
+        if (_flight_stage != AP_TECS::FLIGHT_TAKEOFF) 
+        {
+            float pitchMax_weighted = aparm.land_pitch_cd * 0.01f * _us_fadeout/US_FADE_TIME \
                                   + _PITCHmaxf * (US_FADE_TIME - _us_fadeout)/US_FADE_TIME;
-        _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, pitchMax_weighted);
+            _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, pitchMax_weighted);
+        } else
+        {
+            // TAKEOFF
+            float airspeed_target = 0.01f * (aparm.land_pitch_cd + 600);
+            float pitchMax_weighted = airspeed_target * _us_fadeout/US_FADE_TIME \
+                + _PITCHmaxf * (US_FADE_TIME - _us_fadeout)/US_FADE_TIME;
+            _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, pitchMax_weighted);
+        }
     } else {
         _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
     }
