@@ -794,8 +794,8 @@ void AP_TECS::_update_pitch(void)
         } else
         {
             // TAKEOFF
-            float airspeed_target = 0.01f * (aparm.land_pitch_cd + 600);
-            float pitchMax_weighted = airspeed_target * _us_fadeout/US_FADE_TIME \
+            float takeoff_pitch_target = 0.01f * (aparm.land_pitch_cd + 600);
+            float pitchMax_weighted = takeoff_pitch_target * _us_fadeout/US_FADE_TIME \
                 + _PITCHmaxf * (US_FADE_TIME - _us_fadeout)/US_FADE_TIME;
             _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, pitchMax_weighted);
         }
