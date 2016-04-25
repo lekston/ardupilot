@@ -313,7 +313,7 @@ void Plane::setup_landing_glide_slope(void)
  */
 bool Plane::restart_landing_sequence()
 {
-    if (mission.get_current_nav_cmd().id != MAV_CMD_NAV_LAND) {
+    if (!auto_state.wp_is_land_approach && mission.get_current_nav_cmd().id != MAV_CMD_NAV_LAND) {
         return false;
     }
 
@@ -342,6 +342,21 @@ bool Plane::restart_landing_sequence()
     else if (prev_cmd_with_wp_index != AP_MISSION_CMD_INDEX_NONE &&
                mission.set_current_cmd(prev_cmd_with_wp_index))
     {
+        // Repeat to reset to index LAND^-2
+        uint16_t prev2_cmd_with_wp_index = prev_cmd_with_wp_index;
+
+        if (!auto_state.wp_is_land_approach && prev2_cmd_with_wp_index > 3)
+        {
+            prev2_cmd_with_wp_index-=2;
+        }
+        else if (prev2_cmd_with_wp_index > 2)
+        {
+            prev2_cmd_with_wp_index-=1;
+        }
+
+        mission.set_current_cmd(prev2_cmd_with_wp_index);
+        prev_cmd_with_wp_index = prev2_cmd_with_wp_index;
+
         // if a suitable navigation waypoint was just executed, one that contains lat/lng/alt, then
         // repeat that cmd to restart the landing from the top of approach to repeat intended glide slope
         gcs_send_text_fmt(MAV_SEVERITY_NOTICE, "Restarted landing sequence at waypoint %d", prev_cmd_with_wp_index);

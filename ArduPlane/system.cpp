@@ -544,9 +544,11 @@ void Plane::exit_mode(enum FlightMode mode)
         if (mission.state() == AP_Mission::MISSION_RUNNING) {
             mission.stop();
 
-            if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND)
+            if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND || \
+                auto_state.wp_is_land_approach)
             {
                 restart_landing_sequence();
+                auto_state.wp_is_land_approach = false;
             }
         }
         auto_state.started_flying_in_auto_ms = 0;
