@@ -69,6 +69,7 @@ cscope.in.out
 cscope.out
 cscope.po.out
 dataflash.bin
+doxydocs/*
 eeprom.bin
 index.html
 logs/
