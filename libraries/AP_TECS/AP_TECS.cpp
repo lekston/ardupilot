@@ -255,6 +255,12 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("US_FADETIME", 29, AP_TECS, _us_fade_time_max, 5),
 
+    // @DisplayName: throttle non-linearity compensation coefficient (inverted expotent: x^(1/pow))    
+    // @Range: 1.0 3.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("THR_EXP", 30, AP_TECS, _thr_exp, 1.5f),
+
     AP_GROUPEND
 };
 
@@ -851,6 +857,15 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         _throttle_dem = _throttle_dem + _integTHR_state;
 
         // tabulation to keep git readable
+
+    if ((bool)(_opt_bitmask & USE_OPT_BITMASK_THROTTLE_CURVE))
+    {
+        // correct for the non-linear throttle response
+        if (_thr_exp < 1.01) _thr_exp = 1.0f;
+        if (_thr_exp > 3.0f) _thr_exp = 3.0f;
+
+        _throttle_dem = pow( _throttle_dem, 1.0f/_thr_exp);
+    }
 
     // Constrain throttle demand
     _throttle_dem = constrain_float(_throttle_dem, _THRminf, _THRmaxf);

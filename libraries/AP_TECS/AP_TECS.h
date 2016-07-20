@@ -170,6 +170,7 @@ private:
     AP_Float _us_energy_jerk;
     AP_Int32 _opt_bitmask;
     AP_Int8  _us_fade_time_max;
+    AP_Float _thr_exp;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
@@ -395,3 +396,6 @@ private:
 
 #define USE_OPT_BITMASK_US_LOAD_FACTOR_CORR_1   (1<<4)
 #define USE_OPT_BITMASK_US_LOAD_FACTOR_CORR_2   (1<<5)
+
+#define USE_OPT_BITMASK_THROTTLE_CURVE          (1<<6)
+
