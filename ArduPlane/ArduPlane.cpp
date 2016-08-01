@@ -771,15 +771,69 @@ void Plane::update_flight_mode(void)
         break;
     }
 
-    case FLY_BY_WIRE_B:
+    case FLY_BY_WIRE_B: {
         // Thanks to Yury MonZon for the altitude limit code!
         nav_roll_cd = channel_roll->norm_input() * roll_limit_cd;
         nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
         update_load_factor();
-        update_fbwb_speed_height();
+
+        if ( (bool)(SpdHgt_Controller->get_opt_bitmask() & USE_OPT_BITMASK_THR_FBWB_MANUAL) )
+        {
+          if ( (bool)(SpdHgt_Controller->get_opt_bitmask() & USE_OPT_BITMASK_THR_FBWB_MAN_LIN) )
+          {
+            // force Absolute Manual throttle with throttle curve linearization
+            channel_throttle->input(); // writes pwm to radio_in (used i.a. by percent_input())
+            float throttle_man_dem = channel_throttle->percent_input(); //0% to 100%
+            float throttle_dem = throttle_man_dem; //0 to 100
+
+            float throttle_tecs_debug = 0.0f;
+
+            if ( (bool)(SpdHgt_Controller->get_opt_bitmask() & \
+                        USE_OPT_BITMASK_THR_FBWB_DEVIATION) )
+            {
+                update_fbwb_speed_height(); //this writes to channel_throttle->servo_out
+                throttle_man_dem -= 0.5f * aparm.throttle_max;                 // -50 to 50
+                float throttle_tecs = SpdHgt_Controller->get_throttle_raw_dem();// 0 to 100
+                throttle_dem = throttle_tecs + throttle_man_dem;                // -50 to 150
+                throttle_dem = constrain_float(throttle_dem, 0.0f, 100.0f);     //0 to 100
+                throttle_tecs_debug = throttle_tecs;
+            }
+
+            // print some debug information
+            _debug_counter++;
+            if (_debug_counter > 20)
+            {
+                _debug_counter = 0;
+                gcs_send_text_fmt( MAV_SEVERITY_INFO, \
+                                   "thr_dem=%d;\tthr_man_dem=%d;\tthr_tecs=%d;\n", \
+                                   (int)(throttle_dem), (int)(throttle_man_dem), \
+                                   (int)(throttle_tecs_debug) );
+                ::printf("Test\n");
+            }
+
+            throttle_dem = pow( 0.01f * throttle_dem, 1.0f/2.0f );
+            throttle_dem = constrain_float( 100.0f * throttle_dem, 0.0f, 100.0f);
+            channel_throttle->set_servo_out(throttle_dem);
+
+          }
+          else //if !USE_OPT_BITMASK_THR_FBWB_MAN_LIN
+          {
+            // force Direct Absolute Manual throttle (no throttle curve linearization)
+            channel_throttle->set_pwm(channel_throttle->read()); // writes to radio_in
+            channel_throttle->set_servo_out(channel_throttle->get_control_in());
+          }
+          channel_throttle->calc_pwm(); // writes to radio_out
+          channel_throttle->output();
+        }
+        else //if !USE_OPT_BITMASK_THR_FBWB_MANUAL
+        {
+          update_fbwb_speed_height(); //this calls channel_throttle->set_servo_out()
+        }
+
         break;
-        
-    case CRUISE:
+    }
+
+    case CRUISE: {
         /*
           in CRUISE mode we use the navigation code to control
           roll when heading is locked. Heading becomes unlocked on
@@ -800,7 +854,8 @@ void Plane::update_flight_mode(void)
         }
         update_fbwb_speed_height();
         break;
-        
+    }
+
     case STABILIZE:
         nav_roll_cd        = 0;
         nav_pitch_cd       = 0;

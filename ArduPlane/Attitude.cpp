@@ -1352,7 +1352,9 @@ bool Plane::allow_reverse_thrust(void)
         allow |= (g.use_reverse_thrust & USE_REVERSE_THRUST_CRUISE);
         break;
     case FLY_BY_WIRE_B:
-        allow |= (g.use_reverse_thrust & USE_REVERSE_THRUST_FBWB);
+        // allow |= (g.use_reverse_thrust & USE_REVERSE_THRUST_FBWB);
+        // XXX Flight TEST Configuration XXX
+        allow = true;
         break;
     case AVOID_ADSB:
     case GUIDED:
