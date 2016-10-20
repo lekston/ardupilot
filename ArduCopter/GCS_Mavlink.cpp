@@ -1193,6 +1193,25 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
         break;
     }
 
+    case MAVLINK_MSG_ID_DATA16:
+    {
+        mavlink_data16_t packet;
+        mavlink_msg_data16_decode(msg, &packet);
+
+        switch(packet.type) {
+
+        case 0xAC: //FlyTech camera mount setup
+        {
+            copter.camera_mount.set_camera_params(packet.data[0], packet.data[1], \
+                                                  packet.data[2], packet.data[3]);
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+
     // Pre-Flight calibration requests
     case MAVLINK_MSG_ID_COMMAND_LONG:       // MAV ID: 76
     {

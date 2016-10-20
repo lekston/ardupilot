@@ -649,3 +649,10 @@ void AP_Mount::trigger_imu_helper(uint8_t mntCal)
         _backends[0]->trigger_imu_helper(mntCal);
     }
 }
+
+void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect)
+{
+    if (_backends[0] != NULL) {
+        _backends[0]->set_camera_params(zoomSpd, recShut, flir, srcSelect);
+    }
+}

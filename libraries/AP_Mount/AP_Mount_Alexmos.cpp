@@ -126,6 +126,13 @@ void AP_Mount_Alexmos::trigger_imu_helper(uint8_t mntCal)
     compensate_mount_imu(mntCal);
 }
 
+// camera rig parameters (FlyTech observation setup)
+void AP_Mount_Alexmos::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect)
+{
+    uint8_t data[4] = {zoomSpd, recShut, flir, srcSelect};
+    send_command(CMD_FT_OBSERVATION, data, 4);
+}
+
 /*
  * get_angles
  */

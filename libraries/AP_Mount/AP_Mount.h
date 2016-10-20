@@ -135,6 +135,9 @@ public:
     // mount IMU helper mode
     void trigger_imu_helper(uint8_t mntCal);
 
+    // camera rig parameters (FlyTech observation setup)
+    void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect);
+
     // parameter var table
     static const struct AP_Param::GroupInfo        var_info[];
 

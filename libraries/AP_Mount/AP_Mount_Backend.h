@@ -80,6 +80,9 @@ public:
     // mount IMU helper mode (FlyTech observation setup)
     virtual void trigger_imu_helper(uint8_t mntCal) {}
 
+    // camera rig parameters (FlyTech observation setup)
+    virtual void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect) {}
+
 protected:
 
     // update_targets_from_rc - updates angle targets (i.e. _angle_ef_target_rad) using input from receiver

@@ -54,6 +54,8 @@
 #define CMD_REALTIME_DATA_CUSTOM 88 //'X'
 
 #define CMD_ERROR 255
+//FlyTech Observation setup
+#define CMD_FT_OBSERVATION 1 //0x01
 
 #define AP_MOUNT_ALEXMOS_MODE_NO_CONTROL 0
 #define AP_MOUNT_ALEXMOS_MODE_SPEED 1
@@ -139,6 +141,9 @@ public:
 
     // mount IMU helper mode
     virtual void trigger_imu_helper(uint8_t mntCal);
+
+    // camera rig parameters (FlyTech observation setup)
+    virtual void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect);
 
 private:
 
