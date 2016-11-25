@@ -119,6 +119,14 @@ void AP_Mount_Servo::status_msg(mavlink_channel_t chan)
     mavlink_msg_mount_status_send(chan, 0, 0, _angle_bf_output_deg.y*100, roll_n_mode, _angle_bf_output_deg.z*100);
 }
 
+bool AP_Mount_Servo::get_debug_angles(float& roll, float& tilt, float& pan)
+{
+    roll = degrees(_angle_ef_target_rad.x);
+    tilt = _angle_bf_output_deg.z;//degrees(_angle_ef_target_rad.y);
+    pan = degrees(_angle_ef_target_rad.z);
+    return true;
+}
+
 // stabilize - stabilizes the mount relative to the Earth's frame
 //  input: _angle_ef_target_rad (earth frame targets in radians)
 //  output: _angle_bf_output_deg (body frame angles in degrees)
