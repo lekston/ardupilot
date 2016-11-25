@@ -138,6 +138,9 @@ public:
     // camera rig parameters (FlyTech observation setup)
     void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect);
 
+    // get rotation of the mount with respect to the frame
+    bool get_debug_angles(float& roll, float& tilt, float& pan);
+
     // parameter var table
     static const struct AP_Param::GroupInfo        var_info[];
 

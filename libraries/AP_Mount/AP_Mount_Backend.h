@@ -83,6 +83,9 @@ public:
     // camera rig parameters (FlyTech observation setup)
     virtual void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect) {}
 
+    // get rotation of the mount with respect to the frame
+    virtual bool get_debug_angles(float& roll, float& tilt, float& pan) { return false; }
+
 protected:
 
     // update_targets_from_rc - updates angle targets (i.e. _angle_ef_target_rad) using input from receiver

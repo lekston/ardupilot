@@ -656,3 +656,12 @@ void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir,
         _backends[0]->set_camera_params(zoomSpd, recShut, flir, srcSelect);
     }
 }
+
+bool AP_Mount::get_debug_angles(float& roll, float& tilt, float& pan)
+{
+    if (_backends[0] != NULL) {
+        return _backends[0]->get_debug_angles(roll, tilt, pan);
+    }
+
+    return false;
+}
