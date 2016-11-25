@@ -1200,10 +1200,15 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
 
         switch(packet.type) {
 
-        case 0xAC: //FlyTech camera mount setup
+        case 0xAC: //FlyTech camera setup
         {
             copter.camera_mount.set_camera_params(packet.data[0], packet.data[1], \
                                                   packet.data[2], packet.data[3]);
+            break;
+        }
+        case 0xDC: //FlyTech mount IMU calibration
+        {
+            copter.camera_mount.trigger_imu_helper(packet.data[0]);
             break;
         }
         default:
