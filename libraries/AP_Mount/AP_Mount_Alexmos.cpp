@@ -116,7 +116,8 @@ void AP_Mount_Alexmos::status_msg(mavlink_channel_t chan)
     // NOTE: this routine is called with the LOWEST possible priority 
     // (hence requests for mount angles were moved elsewhere)
 
-    mavlink_msg_mount_status_send(chan, 0, 0, _current_angle.y*100, _current_angle.x*100, _current_angle.z*100);
+    int32_t roll_n_mode = ((int32_t)(_current_angle.x*100) & (int32_t)(~0xF)) + get_mode();
+    mavlink_msg_mount_status_send(chan, 0, 0, -_current_angle.y*100, roll_n_mode, _current_angle.z*100);
 }
 
 // camera rig parameters
