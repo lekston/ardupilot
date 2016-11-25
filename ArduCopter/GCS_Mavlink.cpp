@@ -681,6 +681,15 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
 #if MOUNT == ENABLED
         CHECK_PAYLOAD_SIZE(MOUNT_STATUS);    
         copter.camera_mount.status_msg(chan);
+        {     
+            float x, y, z;
+            if(copter.camera_mount.get_debug_angles(x, y, z))
+            {
+                char str[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN] {};
+                hal.util->snprintf((char *)str, sizeof(str), "MOUNT: %f\t%f\t%f", x, y, z);
+                GCS_MAVLINK::send_statustext(MAV_SEVERITY_WARNING, 0xFF, str);
+            }
+        }
 #endif // MOUNT == ENABLED
         break;
 
