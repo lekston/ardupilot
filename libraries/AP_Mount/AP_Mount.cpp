@@ -649,3 +649,12 @@ void AP_Mount::trigger_imu_helper(uint8_t mntCal)
         _backends[0]->trigger_imu_helper(mntCal);
     }
 }
+
+bool AP_Mount::get_debug_angles(float& roll, float& tilt, float& pan)
+{
+    if (_backends[0] != NULL) {
+        return _backends[0]->get_debug_angles(roll, tilt, pan);
+    }
+
+    return false;
+}

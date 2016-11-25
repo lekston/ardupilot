@@ -80,6 +80,9 @@ public:
     // mount IMU helper mode (FlyTech observation setup)
     virtual void trigger_imu_helper(uint8_t mntCal) {}
 
+    // get rotation of the mount with respect to the frame
+    virtual bool get_debug_angles(float& roll, float& tilt, float& pan) { return false; }
+
 protected:
 
     // update_targets_from_rc - updates angle targets (i.e. _angle_ef_target_rad) using input from receiver

@@ -135,6 +135,9 @@ public:
     // mount IMU helper mode
     void trigger_imu_helper(uint8_t mntCal);
 
+    // get rotation of the mount with respect to the frame
+    bool get_debug_angles(float& roll, float& tilt, float& pan);
+
     // parameter var table
     static const struct AP_Param::GroupInfo        var_info[];
 
