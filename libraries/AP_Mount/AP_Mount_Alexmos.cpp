@@ -36,6 +36,7 @@ void AP_Mount_Alexmos::update()
             {
                 // H1_RAW: compensate NORTH once
                 compensate_mount_imu(AP_MOUNT_ALEXMOS_COMPENSATE_NORTH);
+                _last_imu_corr_ms = AP_HAL::millis();
             }
 
             {
@@ -52,6 +53,12 @@ void AP_Mount_Alexmos::update()
             if (mode_transition) {
                 // H1_RAW: compensate NORTH once
                 compensate_mount_imu(AP_MOUNT_ALEXMOS_COMPENSATE_NORTH);
+                _last_imu_corr_ms = AP_HAL::millis();
+
+#if DEBUG_MOUNT
+                _toggle_output++;
+                if(_toggle_output>2) _toggle_output = 0;
+#endif
             }
 
             {
@@ -64,12 +71,14 @@ void AP_Mount_Alexmos::update()
             break;
 
         // point to the angles given by a mavlink message
+        // FlyTech POSITION MOUNT MODE
         case MAV_MOUNT_MODE_MAVLINK_TARGETING:
             update_target_2x720(_angle_ef_target_2x720, _angle_ef_target_rad*RAD_TO_DEG, true, true);
             control_axis(_angle_ef_target_2x720, true);
             break;
 
         // RC radio manual angle control, but with stabilization from the AHRS
+        // FlyTech SPEED MOUNT MODE
         case MAV_MOUNT_MODE_RC_TARGETING:
             // update targets using pilot's rc inputs
             update_targets_from_rc(true); //do_wrap_yaw
@@ -84,11 +93,21 @@ void AP_Mount_Alexmos::update()
                 update_target_2x720(_angle_ef_target_2x720, _angle_ef_target_rad*RAD_TO_DEG, true, true);
                 control_axis(_angle_ef_target_2x720, true);
             }
+#if DEBUG_MOUNT
+            _toggle_output = 2;
+#endif
             break;
 
         default:
             // we do not know this mode so do nothing
             break;
+    }
+
+    uint32_t now = AP_HAL::millis();
+
+    if (_regular_imu_corr_mode && (_last_imu_corr_ms + _imu_corr_interval_ms < now)) {
+        compensate_mount_imu(_regular_imu_corr_mode);
+        _last_imu_corr_ms = now;
     }
 
     get_angles();
@@ -105,6 +124,9 @@ void AP_Mount_Alexmos::set_mode(enum MAV_MOUNT_MODE mode)
 {
     // record the mode change and return success
     _state._mode = mode;
+
+    // refresh regular imu correction type and interval
+    configure_regular_imu_corr();
 }
 
 // status_msg - called to allow mounts to send their status to GCS using the MOUNT_STATUS message
@@ -123,7 +145,13 @@ void AP_Mount_Alexmos::status_msg(mavlink_channel_t chan)
 // camera rig parameters
 void AP_Mount_Alexmos::trigger_imu_helper(uint8_t mntCal)
 {
+#if DEBUG_MOUNT
+    float error = compensate_mount_imu(mntCal);
+    print_debug_output(3, Vector3f(error, 0.f, 0.f));
+#else
     compensate_mount_imu(mntCal);
+#endif
+    _last_imu_corr_ms = AP_HAL::millis();
 }
 
 // camera rig parameters (FlyTech observation setup)
@@ -132,6 +160,81 @@ void AP_Mount_Alexmos::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8
     uint8_t data[4] = {zoomSpd, recShut, flir, srcSelect};
     send_command(CMD_FT_OBSERVATION, data, 4);
 }
+
+
+void AP_Mount_Alexmos::configure_regular_imu_corr()
+{
+    // NOTE: currently called only on Mount mode change
+    // XXX TEMPORARY DEPENDENCY on MNT_JSTICK_SPD
+    _regular_imu_corr_mode = (_frontend._joystick_speed % 10) % 4; // 0, 1, 2, 3
+
+    _imu_corr_interval_ms = (_frontend._joystick_speed % 100)/10;
+    _imu_corr_interval_ms = 1000 + _imu_corr_interval_ms*2000; // i.e.: 101..103 is 1sec, 121..123 is 5sec, etc.
+    // XXX TEMPORARY DEPENDENCY on MNT_JSTICK_SPD
+
+#if DEBUG_MOUNT
+    if (_regular_imu_corr_mode) // AP_MOUNT_ALEXMOS_COMPENSATE_NO_OP == 0
+    {
+        // request SimpleBGC for streaming IMU North and Zenith for debugging
+        set_data_stream_interval();
+    }
+#endif
+}
+
+#if DEBUG_MOUNT
+void AP_Mount_Alexmos::print_debug_output(uint8_t type, const Vector3f& v)
+{
+    uint32_t now = AP_HAL::millis();
+
+    if (_last_debug_output_ms + 500 < now)
+    {
+        _last_debug_output_ms = now;
+
+        char str[120] {};
+        switch (type) {
+        case 0:
+            hal.util->snprintf((char *)str, sizeof(str),
+                                "M_z:\t%.3f\t%.3f\t%.3f\tPLz:\t%.3f\t%.3f\t%.3f\0",
+                                _current_zenith.x, _current_zenith.y, _current_zenith.z,
+                                v.x, v.y, v.z);
+            break;
+        case 1:
+            hal.util->snprintf((char *)str, sizeof(str),
+                                "M_n:\t%.3f\t%.3f\t%.3f\tPLn:\t%.3f\t%.3f\t%.3f\0",
+                                _current_north.x, _current_north.y, _current_north.z,
+                                v.x, v.y, v.z);
+            break;
+        case 2:
+            hal.util->snprintf((char *)str, sizeof(str),
+                                "G_lat:\t%ld\tG_lon:\t%ld", _state._roi_target.lat, _state._roi_target.lng);
+            
+            break;
+        case 3:
+            hal.util->snprintf((char *)str, sizeof(str), "MNT North corr:\t%6f deg\0",  v.x);
+            break;
+        default:
+            hal.util->snprintf((char *)str, sizeof(15),
+                                "Index unsupported\0");
+
+        }
+        GCS_MAVLINK::send_statustext(MAV_SEVERITY_WARNING, 0xFF, str);
+
+        /*
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "A_n:\t%.3f\t%.3f\t%.3f\tA_e:\t%.3f\t%.3f\t%.3f\0",
+                            dcm.a.x, dcm.a.y, dcm.a.z,
+                            dcm.b.x, dcm.b.y, dcm.b.z);
+        */
+
+        /*
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "A_n:\t%.3f\t%.3f\t%.3f\tA_d:\t%.3f\t%.3f\t%.3f\0",
+                            dcm.a.x, dcm.a.y, dcm.a.z,
+                            dcm.c.x, dcm.c.y, dcm.c.z);
+        */
+    }
+}
+#endif
 
 /*
  * get_angles
@@ -245,6 +348,10 @@ float AP_Mount_Alexmos::compensate_mount_imu(uint8_t mntCal_mode)
         default:
             break;
     }
+
+#if DEBUG_MOUNT
+    print_debug_output(_toggle_output, _toggle_output ? north_m : zenith_m);
+#endif
 
     return wrap_180(_current_angle.z - _current_stat_rot_angle.z - _frontend._ahrs.yaw*RAD_TO_DEG);
 }

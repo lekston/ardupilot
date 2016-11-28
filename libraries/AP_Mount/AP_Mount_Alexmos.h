@@ -97,6 +97,8 @@
 #define DEGREE_TO_VALUE(d) ((int16_t)((float)(d)*(1.0f/0.02197265625f)))
 #define DEGREE_PER_SEC_TO_VALUE(d) ((int16_t)((float)(d)*(1.0f/0.1220740379f)))
 
+#define DEBUG_MOUNT 1
+
 class AP_Mount_Alexmos : public AP_Mount_Backend
 {
 public:
@@ -115,6 +117,13 @@ public:
         _current_north(0.0f, 0.0f, 0.0f),
         _current_stat_rot_angle(0.0f, 0.0f, 0.0f),
         _angle_ef_target_2x720(0.0f, 0.0f, 0.0f),
+        _last_imu_corr_ms(0),
+        _imu_corr_interval_ms(0),
+        _regular_imu_corr_mode(0x00),
+#if DEBUG_MOUNT
+        _toggle_output(0),
+        _last_debug_output_ms(0),
+#endif
         _param_read_once(false),
         _checksum(0),
         _step(0),
@@ -145,6 +154,13 @@ public:
     // camera rig parameters (FlyTech observation setup)
     virtual void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect);
 
+    // configure correction interval and correciton mode
+    void configure_regular_imu_corr();
+
+#if DEBUG_MOUNT
+    // provide debug output to console
+    void print_debug_output(uint8_t type, const Vector3f& vect);
+#endif
 private:
 
     // get_angles -
@@ -414,7 +430,16 @@ private:
 
     Vector3f _angle_ef_target_2x720;
 
+    uint32_t _last_imu_corr_ms;
+    uint16_t _imu_corr_interval_ms;
+    uint8_t  _regular_imu_corr_mode;
+
     enum MAV_MOUNT_MODE _prev_mount_mode;
+
+#if DEBUG_MOUNT
+    uint8_t _toggle_output;
+    uint32_t _last_debug_output_ms;
+#endif
 
     uint16_t _rt_data_timestamp;
 
