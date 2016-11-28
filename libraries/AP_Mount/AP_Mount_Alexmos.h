@@ -95,6 +95,8 @@
 #define DEGREE_TO_VALUE(d) ((int16_t)((float)(d)*(1.0f/0.02197265625f)))
 #define DEGREE_PER_SEC_TO_VALUE(d) ((int16_t)((float)(d)*(1.0f/0.1220740379f)))
 
+#define DEBUG_MOUNT 1
+
 class AP_Mount_Alexmos : public AP_Mount_Backend
 {
 public:
@@ -113,6 +115,12 @@ public:
         _current_north(0.0f, 0.0f, 0.0f),
         _current_stat_rot_angle(0.0f, 0.0f, 0.0f),
         _angle_ef_target_2x720(0.0f, 0.0f, 0.0f),
+        _divider(0),
+        _imu_corr_interval(0),
+        _regular_imu_corr_mode(0x00),
+#if DEBUG_MOUNT
+        _toggle_output(0),
+#endif
         _param_read_once(false),
         _checksum(0),
         _step(0),
@@ -139,6 +147,20 @@ public:
 
     // mount IMU helper mode
     virtual void trigger_imu_helper(uint8_t mntCal);
+
+    // TODO redo the interface and overal accessibility of debug messaging
+    // get rotation of the mount with respect to the frame
+    virtual bool get_debug_angles(float& x, float& y, float& z);
+
+    // TODO implement a control interface for setting up the mount IMU compensation
+    // mount IMU correction interval (in multiples of 100ms)
+    void set_correction_interval(uint16_t iv) {}
+
+    void set_correction_type() {}
+
+    void set_debug_output_type() {}
+
+    void get_debug_output() {}
 
 private:
 
@@ -409,7 +431,15 @@ private:
 
     Vector3f _angle_ef_target_2x720;
 
+    uint16_t _divider;
+    uint16_t _imu_corr_interval;
+    uint8_t  _regular_imu_corr_mode;
+
     enum MAV_MOUNT_MODE _prev_mount_mode;
+
+#if DEBUG_MOUNT
+    int8_t _toggle_output;
+#endif
 
     uint16_t _rt_data_timestamp;
 

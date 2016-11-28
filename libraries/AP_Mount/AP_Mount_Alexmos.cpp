@@ -28,6 +28,15 @@ void AP_Mount_Alexmos::update()
     }
     _prev_mount_mode = mount_mode;
 
+    // TODO use HAL scheduler/timer
+    _divider++;
+    // XXX TEMPORARY DEPENDENCY on MNT_JSTICK_SPD
+    _regular_imu_corr_mode = (_frontend._joystick_speed % 10) % 4; // 0, 1, 2, 3
+
+    _imu_corr_interval = (_frontend._joystick_speed % 100)/10;
+    _imu_corr_interval = 10 + _imu_corr_interval*20; // i.e.: 101..103 is 1sec, 121..123 is 5sec, etc.
+    // XXX TEMPORARY DEPENDENCY on MNT_JSTICK_SPD
+
     // update based on mount mode
     switch(mount_mode) {
         // move mount to a "retracted" position.  we do not implement a separate servo based retract mechanism
@@ -36,6 +45,11 @@ void AP_Mount_Alexmos::update()
             {
                 // H1_RAW: compensate NORTH once
                 compensate_mount_imu(AP_MOUNT_ALEXMOS_COMPENSATE_NORTH);
+
+#if DEBUG_MOUNT
+                set_data_stream_interval();
+#endif
+                _divider = 1;
             }
 
             {
@@ -52,6 +66,12 @@ void AP_Mount_Alexmos::update()
             if (mode_transition) {
                 // H1_RAW: compensate NORTH once
                 compensate_mount_imu(AP_MOUNT_ALEXMOS_COMPENSATE_NORTH);
+
+#if DEBUG_MOUNT
+                _toggle_output++;
+                if(_toggle_output>4) _toggle_output = 0;
+#endif
+                _divider = 1;
             }
 
             {
@@ -84,11 +104,18 @@ void AP_Mount_Alexmos::update()
                 update_target_2x720(_angle_ef_target_2x720, _angle_ef_target_rad*RAD_TO_DEG, true, true);
                 control_axis(_angle_ef_target_2x720, true);
             }
+#if DEBUG_MOUNT
+            _toggle_output = 4;
+#endif
             break;
 
         default:
             // we do not know this mode so do nothing
             break;
+    }
+
+    if (_regular_imu_corr_mode && ((_divider % _imu_corr_interval) == 0)) {
+        compensate_mount_imu(_regular_imu_corr_mode);
     }
 
     get_angles();
@@ -122,7 +149,59 @@ void AP_Mount_Alexmos::status_msg(mavlink_channel_t chan)
 // camera rig parameters
 void AP_Mount_Alexmos::trigger_imu_helper(uint8_t mntCal)
 {
-    compensate_mount_imu(mntCal);
+    float error = 0.0f;
+    error = compensate_mount_imu(mntCal);
+
+    char str[50] {};
+    hal.util->snprintf((char *)str, sizeof(str), "MNT North corr:\t%6f deg\0",  error);
+    GCS_MAVLINK::send_statustext(MAV_SEVERITY_INFO, 0xFF, str);
+}
+
+/*
+ * get_debug_angles - return orientation of the gimbal IMU reference frame
+ */
+bool AP_Mount_Alexmos::get_debug_angles(float& x, float& y, float& z)
+{
+
+#if DEBUG_MOUNT
+    if (_divider % 50 == 0 || (_regular_imu_corr_mode == 0 && _divider % 10 == 0)) {
+
+        bool do_send = true;
+        char str[60] {};
+
+        switch (_regular_imu_corr_mode) {
+
+        case AP_MOUNT_ALEXMOS_COMPENSATE_NORTH: {
+            hal.util->snprintf((char *)str, sizeof(str),
+                                "CORR: NORTH, C_div:\t%6d\0",  _divider);
+            }
+            break;
+
+        case AP_MOUNT_ALEXMOS_COMPENSATE_ZENITH: {
+            hal.util->snprintf((char *)str, sizeof(str),
+                                "CORR: ZENITH, C_div:\t%6d\0", _divider);
+            }
+            break;
+
+        case AP_MOUNT_ALEXMOS_COMPENSATE_BOTH: {
+            hal.util->snprintf((char *)str, sizeof(str),
+                                "CORR: N & Z, C_div:\t%6d\0",  _divider);
+            }
+            break;
+        default:
+            compensate_mount_imu(AP_MOUNT_ALEXMOS_COMPENSATE_NO_OP);
+            do_send = false;
+            break;
+        }
+
+        if (do_send) {
+            GCS_MAVLINK::send_statustext(MAV_SEVERITY_INFO, 0xFF, str);
+        }
+
+    }
+#endif
+
+    return false; // false avoids sending (x,y,z) by external routines
 }
 
 /*
@@ -237,6 +316,53 @@ float AP_Mount_Alexmos::compensate_mount_imu(uint8_t mntCal_mode)
         default:
             break;
     }
+
+
+#if DEBUG_MOUNT
+    char str[120] {};
+    switch (_toggle_output) {
+    case 0:
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "M_z:\t%.3f\t%.3f\t%.3f\tPLz:\t%.3f\t%.3f\t%.3f\0",
+                            _current_zenith.x, _current_zenith.y, _current_zenith.z,
+                            zenith_m.x, zenith_m.y, zenith_m.z);
+        break;
+    case 1:
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "M_n:\t%.3f\t%.3f\t%.3f\tPLn:\t%.3f\t%.3f\t%.3f\0",
+                            _current_north.x, _current_north.y, _current_north.z,
+                            north_m.x, north_m.y, north_m.z);
+        break;
+    case 2:
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "A_n:\t%.3f\t%.3f\t%.3f\tA_e:\t%.3f\t%.3f\t%.3f\0",
+                            dcm.a.x, dcm.a.y, dcm.a.z,
+                            dcm.b.x, dcm.b.y, dcm.b.z);
+        break;
+    case 3:
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "A_n:\t%.3f\t%.3f\t%.3f\tA_d:\t%.3f\t%.3f\t%.3f\0",
+                            dcm.a.x, dcm.a.y, dcm.a.z,
+                            dcm.c.x, dcm.c.y, dcm.c.z);
+        break;
+    case 4:
+        /*
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "L_n:\t%.3f\t%.3f\t%.3f\tL_u:\t%.3f\t%.3f\t%.3f\0",
+                            north.x, north.y, north.z,
+                            zenith.x, zenith.y, zenith.z);
+        */
+        hal.util->snprintf((char *)str, sizeof(str),
+                            "G_lat:\t%ld\tG_lon:\t%ld", _state._roi_target.lat, _state._roi_target.lng);
+        
+        break;
+    default:
+        hal.util->snprintf((char *)str, sizeof(15),
+                            "Index error\0");
+
+    }
+    GCS_MAVLINK::send_statustext(MAV_SEVERITY_WARNING, 0xFF, str);
+#endif
 
     return wrap_180(_current_angle.z - _current_stat_rot_angle.z - _frontend._ahrs.yaw*RAD_TO_DEG);
 }
