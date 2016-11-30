@@ -264,9 +264,6 @@ void Copter::exit_mode(control_mode_t old_control_mode, control_mode_t new_contr
         if (mission.state() == AP_Mission::MISSION_RUNNING) {
             mission.stop();
         }
-#if MOUNT == ENABLED
-        camera_mount.set_mode_to_default();
-#endif  // MOUNT == ENABLED
     }
 
     // smooth throttle transition when switching from manual to automatic flight modes
