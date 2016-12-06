@@ -120,6 +120,8 @@ public:
         _last_imu_corr_ms(0),
         _imu_corr_interval_ms(0),
         _regular_imu_corr_mode(0x00),
+        _pan_err_rate_avg(0.0f),
+        _tilt_err_rate_avg(0.0f),
 #if DEBUG_MOUNT
         _toggle_output(0),
         _last_debug_output_ms(0),
@@ -435,6 +437,9 @@ private:
     uint8_t  _regular_imu_corr_mode;
 
     enum MAV_MOUNT_MODE _prev_mount_mode;
+
+    float _pan_err_rate_avg;
+    float _tilt_err_rate_avg;
 
 #if DEBUG_MOUNT
     uint8_t _toggle_output;
