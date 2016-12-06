@@ -55,6 +55,10 @@ public:
 	// demanded throttle in percentage
 	// should return 0 to 100
 	virtual int32_t get_throttle_demand(void)=0;
+
+	virtual int32_t get_throttle_raw_dem(void) const { return 0; }
+
+	virtual int32_t get_opt_bitmask(void) const { return 0; }
 	
 	// demanded pitch angle in centi-degrees
 	// should return -9000 to +9000
