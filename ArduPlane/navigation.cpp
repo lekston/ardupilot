@@ -108,12 +108,13 @@ void Plane::calc_airspeed_errors()
     ahrs.airspeed_estimate(&airspeed_measured);
 
     // FBW_B airspeed target
-    if (control_mode == FLY_BY_WIRE_B || 
-        control_mode == CRUISE) {
+    if (control_mode == FLY_BY_WIRE_B) {
+        // leave at cruise target when in TECS test config
+    } else if (control_mode == CRUISE) {
         target_airspeed_cm = ((int32_t)(aparm.airspeed_max -
                                         aparm.airspeed_min) *
                               channel_throttle->get_control_in()) +
-                             ((int32_t)aparm.airspeed_min * 100);
+                             ((int32_t)aparm.airspeed_min * 100 + 200);
 
     } else if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
         // Landing airspeed target

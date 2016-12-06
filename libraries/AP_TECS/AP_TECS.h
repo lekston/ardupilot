@@ -64,6 +64,11 @@ public:
         return int32_t(_throttle_dem * 100.0f);
     }
 
+    int32_t get_throttle_raw_dem(void) const {
+        return int32_t(100.0f* constrain_float(_throttle_raw_dem, _THRminf, _THRmaxf) );
+        // range: 0 - 100, non-linearized
+    }
+
     // demanded pitch angle in centi-degrees
     // should return between -9000 to +9000
     int32_t get_pitch_demand(void) {
@@ -128,6 +133,10 @@ public:
          */
         // hal.console->printf("Low speed, check engine\n");
         return _flags.underspeed;
+    }
+
+    int32_t get_opt_bitmask(void) const {
+        return int32_t(_opt_bitmask);
     }
 
     // this supports the TECS_* user settable parameters
@@ -195,6 +204,8 @@ private:
 
     // throttle demand in the range from -1.0 to 1.0, usually positive unless reverse thrust is enabled via _THRminf < 0
     float _throttle_dem;
+
+    float _throttle_raw_dem;
 
     // pitch angle demand in radians
     float _pitch_dem;
@@ -405,6 +416,7 @@ private:
 };
 
 #define USE_OPT_BITMASK_DEFAULT                 0x00C0 // jerk inertial by default for all modes
+
 #define USE_OPT_BITMASK_ANTI_WINDUP_1           (1<<0)
 #define USE_OPT_BITMASK_ANTI_WINDUP_2           (1<<1)
 #define USE_OPT_BITMASK_US_THROTTLE_JERK_MODE_L (1<<2) // 0-1st order inertial / 1-energy based
@@ -413,5 +425,12 @@ private:
 #define USE_OPT_BITMASK_US_LOAD_FACTOR_CORR_1   (1<<4)
 #define USE_OPT_BITMASK_US_LOAD_FACTOR_CORR_2   (1<<5)
 
-#define USE_OPT_BITMASK_THROTTLE_CURVE          (1<<6)
+#define USE_OPT_BITMASK_THROTTLE_CURVE          (1<<6)  // Enabled by default; 0x40
+#define USE_OPT_BITMASK_RESERVED0               (1<<7)  // Enabled by default; 0x80
+
+#define USE_OPT_BITMASK_THR_FBWB_MANUAL         (1<<8)  // Disabled by default; 0x100
+#define USE_OPT_BITMASK_THR_FBWB_MAN_LIN        (1<<9)  // Disabled by default; 0x200
+#define USE_OPT_BITMASK_THR_FBWB_DEVIATION      (1<<10) // Disabled by default; 0x400
+
+// use _opt_bitmask 0x07C0 for FBWB TECS testing
 
