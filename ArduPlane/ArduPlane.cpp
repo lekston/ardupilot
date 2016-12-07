@@ -1112,17 +1112,7 @@ void Plane::update_flight_stage(void)
                 } else if (auto_state.land_pre_flare == true) {
                     set_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_PREFLARE);
                 } else if (flight_stage != AP_SpdHgtControl::FLIGHT_LAND_APPROACH) {
-                    bool heading_lined_up = abs(nav_controller->bearing_error_cd()) < 1000 && !nav_controller->data_is_stale();
-                    bool on_flight_line = abs(nav_controller->crosstrack_error() < 5) && !nav_controller->data_is_stale();
-                    bool below_prev_WP = current_loc.alt < prev_WP_loc.alt;
-                    if ((mission.get_prev_nav_cmd_id() == MAV_CMD_NAV_LOITER_TO_ALT) ||
-                        (auto_state.wp_proportion >= 0 && heading_lined_up && on_flight_line) ||
-                        (auto_state.wp_proportion > 0.15f && heading_lined_up && below_prev_WP) ||
-                        (auto_state.wp_proportion > 0.5f)) {
-                        set_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_APPROACH);
-                    } else {
-                        set_flight_stage(AP_SpdHgtControl::FLIGHT_NORMAL);                        
-                    }
+                    set_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_APPROACH);
                 }
             } else if (quadplane.in_assisted_flight()) {
                 set_flight_stage(AP_SpdHgtControl::FLIGHT_VTOL);
