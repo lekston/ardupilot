@@ -55,6 +55,7 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
 
     // determine stage
     if (type_slope_stage == SLOPE_STAGE_NORMAL) {
+      #if 0 // DO NOT WAIT WITH THE DESCENT TOO LONG
         const bool heading_lined_up = abs(nav_controller->bearing_error_cd()) < 1000 && !nav_controller->data_is_stale();
         const bool on_flight_line = fabsf(nav_controller->crosstrack_error()) < 5.0f && !nav_controller->data_is_stale();
         const bool below_prev_WP = current_loc.alt < prev_WP_loc.alt;
@@ -64,6 +65,8 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
             (wp_proportion > 0.5f)) {
             type_slope_stage = SLOPE_STAGE_APPROACH;
         }
+      #endif
+        type_slope_stage = SLOPE_STAGE_APPROACH;
     }
 
 
