@@ -434,15 +434,20 @@ void AP_Mount_Alexmos::control_axis(const Vector3f& angle, bool target_in_degree
 
     // rate of change helps in choosing the right rotation speed for the gimbal
     // this is called at 50Hz so yaw_error*50 = required rotation speed (in degs/sec)
-    const float speed_min = AP_MOUNT_ALEXMOS_SPEED*0.5f;
+    const float speed_min = AP_MOUNT_ALEXMOS_SPEED*0.02f;
     const float speed_max = AP_MOUNT_ALEXMOS_SPEED*2.0f;
 
     float pan_rate_dem = constrain_float(abs(_pan_err_rate_avg), speed_min, speed_max);
     float tilt_rate_dem = constrain_float(abs(_tilt_err_rate_avg), speed_min, speed_max);
 
+    bool use_speed = (pan_rate_dem > 0.1) && (tilt_rate_dem > 0.1);
+
+    if (_pan_err_rate_avg < 0) pan_rate_dem *=-1.0;
+    if (_tilt_err_rate_avg > 0) tilt_rate_dem *=-1.0; //since this shit is inverted
 
     alexmos_parameters outgoing_buffer;
-    outgoing_buffer.angle_speed.mode = AP_MOUNT_ALEXMOS_MODE_ANGLE;
+    outgoing_buffer.angle_speed.mode = use_speed ? AP_MOUNT_ALEXMOS_MODE_SPEED_ANGLE
+                                                 : AP_MOUNT_ALEXMOS_MODE_ANGLE;
     outgoing_buffer.angle_speed.speed_roll = DEGREE_PER_SEC_TO_VALUE(AP_MOUNT_ALEXMOS_SPEED);
     outgoing_buffer.angle_speed.angle_roll = DEGREE_TO_VALUE(target_deg.x);
     outgoing_buffer.angle_speed.speed_pitch = boost * DEGREE_PER_SEC_TO_VALUE(tilt_rate_dem);
