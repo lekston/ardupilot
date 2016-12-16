@@ -45,7 +45,7 @@ void AP_Mount_Alexmos::update()
 
                 update_target_2x720(_angle_ef_target_2x720, retract_target, true, true);
             }
-            control_axis(_angle_ef_target_2x720, true);
+            control_axis(_angle_ef_target_2x720, true, 1.5f);
             break;
 
         // move mount to a neutral position, typically pointing forward
@@ -67,7 +67,7 @@ void AP_Mount_Alexmos::update()
 
                 update_target_2x720(_angle_ef_target_2x720, neutral_target, true, true);
             }
-            control_axis(_angle_ef_target_2x720, true);
+            control_axis(_angle_ef_target_2x720, true, 1.5f);
             break;
 
         // point to the angles given by a mavlink message
@@ -359,7 +359,7 @@ float AP_Mount_Alexmos::compensate_mount_imu(uint8_t mntCal_mode)
 /*
  *
  */
-void AP_Mount_Alexmos::update_target_2x720(Vector3f& current_target, const Vector3f& new_target, bool is_earth_fixed, bool invert_pitch)
+void AP_Mount_Alexmos::update_target_2x720(Vector3f& current_target, const Vector3f& new_target, bool is_earth_fixed, bool invert_pitch, bool is_control_input)
 {
     current_target.x = new_target.x;
 
@@ -376,22 +376,24 @@ void AP_Mount_Alexmos::update_target_2x720(Vector3f& current_target, const Vecto
     float yaw_error = wrap_180(new_target.z - current_target.z);
     current_target.z = wrap_2x720(current_target.z + yaw_error);
 
-    int16_t opt = (int16_t)(_state._tilt_angle_max) % 4;
-    const float freq = 50.f;
+    if (is_control_input) {
+        int16_t opt = (int16_t)(_state._tilt_angle_max) % 4;
+        const float freq = 20.f;
 
-    if (opt == 0) {
-        // compute average from last 10 errors (for speed demand)
-        _pan_err_rate_avg = 0.8f * _pan_err_rate_avg + 0.2f * yaw_error * freq;
-        _tilt_err_rate_avg = 0.8f * _tilt_err_rate_avg + 0.2f * tilt_error * freq;
-    } else if (opt == 1) {
-        _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*0.5f;
-        _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*0.5f;
-    } else if (opt == 2) {
-        _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED;
-        _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED;
-    } else if (opt == 3) {
-        _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*2.f;
-        _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*2.f;
+        if (opt == 0) {
+            // compute average from last 10 errors (for speed demand)
+            _pan_err_rate_avg = 0.9f * _pan_err_rate_avg + 0.1f * yaw_error * freq;
+            _tilt_err_rate_avg = 0.9f * _tilt_err_rate_avg + 0.1f * tilt_error * freq;
+        } else if (opt == 1) {
+            _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*0.5f;
+            _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*0.5f;
+        } else if (opt == 2) {
+            _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED;
+            _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED;
+        } else if (opt == 3) {
+            _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*2.f;
+            _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*2.f;
+        }
     }
 }
 
@@ -435,19 +437,22 @@ void AP_Mount_Alexmos::control_axis(const Vector3f& angle, bool target_in_degree
     // rate of change helps in choosing the right rotation speed for the gimbal
     // this is called at 50Hz so yaw_error*50 = required rotation speed (in degs/sec)
     const float speed_min = AP_MOUNT_ALEXMOS_SPEED*0.02f;
-    const float speed_max = AP_MOUNT_ALEXMOS_SPEED*2.0f;
+    const float speed_max = AP_MOUNT_ALEXMOS_SPEED*1.5f;
 
     float pan_rate_dem = constrain_float(abs(_pan_err_rate_avg), speed_min, speed_max);
     float tilt_rate_dem = constrain_float(abs(_tilt_err_rate_avg), speed_min, speed_max);
 
-    bool use_speed = (pan_rate_dem > 0.1) && (tilt_rate_dem > 0.1);
-
-    if (_pan_err_rate_avg < 0) pan_rate_dem *=-1.0;
-    if (_tilt_err_rate_avg > 0) tilt_rate_dem *=-1.0; //since this shit is inverted
+    /*
+    if (_pan_err_rate_avg < 0) {
+        pan_rate_dem *=-1.0;
+    }
+    if (_tilt_err_rate_avg < 0) {
+        tilt_rate_dem *=-1.0;
+    }
+    */
 
     alexmos_parameters outgoing_buffer;
-    outgoing_buffer.angle_speed.mode = use_speed ? AP_MOUNT_ALEXMOS_MODE_SPEED_ANGLE
-                                                 : AP_MOUNT_ALEXMOS_MODE_ANGLE;
+    outgoing_buffer.angle_speed.mode = AP_MOUNT_ALEXMOS_MODE_ANGLE;
     outgoing_buffer.angle_speed.speed_roll = DEGREE_PER_SEC_TO_VALUE(AP_MOUNT_ALEXMOS_SPEED);
     outgoing_buffer.angle_speed.angle_roll = DEGREE_TO_VALUE(target_deg.x);
     outgoing_buffer.angle_speed.speed_pitch = boost * DEGREE_PER_SEC_TO_VALUE(tilt_rate_dem);
@@ -523,7 +528,7 @@ void AP_Mount_Alexmos::parse_body()
             _current_angle.x = VALUE_TO_DEGREE(_buffer.angles_ext.angle_roll);
             _current_angle.y = VALUE_TO_DEGREE(_buffer.angles_ext.angle_pitch);
             _current_angle.z = VALUE_TO_DEGREE(_buffer.angles_ext.angle_yaw);
-            update_target_2x720(_angle_ef_target_2x720, _current_angle, true, true);
+            update_target_2x720(_angle_ef_target_2x720, _current_angle, true, true, false);
 
             _current_stat_rot_angle.x = VALUE_TO_DEGREE(_buffer.angles_ext.stator_rotor_roll);
             _current_stat_rot_angle.y = VALUE_TO_DEGREE(_buffer.angles_ext.stator_rotor_pitch); 

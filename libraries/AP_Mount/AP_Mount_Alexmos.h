@@ -178,7 +178,7 @@ private:
     float compensate_mount_imu(uint8_t mntCal_mode);
 
     // translate mount target to Alexmos convetion (-720deg, +720deg) pan range
-    void update_target_2x720(Vector3f& current_target, const Vector3f& new_target, bool is_earth_fixed, bool invert_pitch);
+    void update_target_2x720(Vector3f& current_target, const Vector3f& new_target, bool is_earth_fixed, bool invert_pitch, bool is_control_input = true);
 
     // set_motor will activate motors if true, and disable them if false
     void set_motor(bool on);
