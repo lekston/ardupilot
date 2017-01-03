@@ -1897,7 +1897,7 @@ void AP_Param::send_parameter(const char *name, enum ap_var_type var_type, uint8
     if (idx != 0 && var_type == AP_PARAM_VECTOR3F) {
         var_type = AP_PARAM_FLOAT;
     }
-    if (var_type > AP_PARAM_VECTOR3F) {
+    if (var_type > AP_PARAM_FLOAT_S || var_type == AP_PARAM_GROUP) {
         // invalid
         return;
     }
