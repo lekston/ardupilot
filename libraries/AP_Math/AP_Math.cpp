@@ -120,7 +120,7 @@ template auto wrap_360_cd<short>(const short angle) -> decltype(wrap_360(angle, 
 template auto wrap_360_cd<double>(const double angle) -> decltype(wrap_360(angle, 100.f));
 
 template <class T>
-float wrap_2x720(const T angle, float unit_mod = 1)
+float wrap_2x720(const T angle, float unit_mod)
 {
     const float ang_1440 = 4.f * 360.f * unit_mod;
     const float ang_720 = 2.f * 360.f * unit_mod;
