@@ -115,7 +115,7 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(gcs_send_heartbeat,     1,    110),
     SCHED_TASK(gcs_send_deferred,     50,    550),
     SCHED_TASK(gcs_data_stream_send,  50,    550),
-    SCHED_TASK(update_mount,          50,     75),
+    SCHED_TASK(update_mount,          50,    400),
     SCHED_TASK(update_trigger,        50,     75),
     SCHED_TASK(ten_hz_logging_loop,   10,    350),
     SCHED_TASK(twentyfive_hz_logging, 25,    110),
