@@ -99,6 +99,11 @@
 
 #define DEBUG_MOUNT 0
 
+#define ENABLE_FUNCTION_A 0x01
+#define ENABLE_FUNCTION_B 0x02
+#define ENABLE_FUNCTION_C 0x04
+#define ENABLE_FUNCTION_D 0x08
+
 class AP_Mount_Alexmos : public AP_Mount_Backend
 {
 public:
