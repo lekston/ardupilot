@@ -18,13 +18,14 @@ static uint32_t vel_update_time_ms;         // system time of last target update
 
 struct {
     uint32_t update_time_ms;
+    uint32_t timeout_ms;
     float roll_cd;
     float pitch_cd;
     float yaw_cd;
     float yaw_rate_cds;
     float climb_rate_cms;
     bool use_yaw_rate;
-} static guided_angle_state = {0,0.0f, 0.0f, 0.0f, 0.0f, 0.0f, false};
+} static guided_angle_state = {0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, false};
 
 struct Guided_Limit {
     uint32_t timeout_ms;  // timeout (in seconds) from the time that guided is invoked
@@ -266,7 +267,7 @@ void Copter::guided_set_destination_posvel(const Vector3f& destination, const Ve
 }
 
 // set guided mode angle target
-void Copter::guided_set_angle(const Quaternion &q, float climb_rate_cms, bool use_yaw_rate, float yaw_rate_rads)
+void Copter::guided_set_angle(const Quaternion &q, float climb_rate_cms, bool use_yaw_rate, float yaw_rate_rads, uint32_t timeout_ms)
 {
     // check we are in velocity control mode
     if (guided_mode != Guided_Angle) {
@@ -283,6 +284,7 @@ void Copter::guided_set_angle(const Quaternion &q, float climb_rate_cms, bool us
 
     guided_angle_state.climb_rate_cms = climb_rate_cms;
     guided_angle_state.update_time_ms = millis();
+    guided_angle_state.timeout_ms = timeout_ms;
 
     // interpret positive climb rate as triggering take-off
     if (motors.armed() && !ap.auto_armed && (guided_angle_state.climb_rate_cms > 0.0f)) {
@@ -598,7 +600,7 @@ void Copter::guided_angle_control_run()
 
     // check for timeout - set lean angles and climb rate to zero if no updates received for 3 seconds
     uint32_t tnow = millis();
-    if (tnow - guided_angle_state.update_time_ms > GUIDED_ATTITUDE_TIMEOUT_MS) {
+    if (tnow - guided_angle_state.update_time_ms > guided_angle_state.timeout_ms) {
         roll_in = 0.0f;
         pitch_in = 0.0f;
         climb_rate_cms = 0.0f;

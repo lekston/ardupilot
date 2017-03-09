@@ -69,4 +69,18 @@ AP_AdvancedFailsafe::control_mode AP_AdvancedFailsafe_Copter::afs_mode(void)
     return AP_AdvancedFailsafe::AFS_STABILIZED;
 }
 
+void AP_AdvancedFailsafe_Copter::vehicle_gps_loss_specific(void)
+{
+	const uint32_t timeout_ms = 1 * 60 * 1000;
+	copter.set_mode(GUIDED_NOGPS, MODE_REASON_GCS_COMMAND);
+//	const Vector3f wind = copter.ahrs.wind_estimate();
+	const Location& home = copter.ahrs.get_home();
+	const Location& last_fixed_loc = copter.ahrs.get_gps().location();
+	int32_t bearing_cd = get_bearing_cd(last_fixed_loc, home);
+	Quaternion q;
+	//TODO compensate wind
+	q.from_euler(0.0, ToRad(-10.0f), ToRad(bearing_cd / 100.0f));
+	copter.guided_set_angle(q, 10.0, false, 0.5, timeout_ms);
+}
+
 #endif // ADVANCED_FAILSAFE

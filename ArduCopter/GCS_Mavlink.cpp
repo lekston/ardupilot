@@ -1215,14 +1215,41 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
                                                   packet.data[2], packet.data[3]);
             break;
         }
+
+        case 0xBD:
+        {
+            /* Dead reckoning
+             * data[0] -> enable / disable
+             * data[1] -> time in minutes
+             * data[2] -> roll in deg
+             * data[3] -> pitch in deg
+             */
+            if( packet.data[0] )
+            {
+                const uint32_t timeout_ms = packet.data[1] * 60 * 1000;
+                copter.set_mode(GUIDED_NOGPS, MODE_REASON_GCS_COMMAND);
+                //const Vector3f wind = copter.ahrs.wind_estimate();
+                const Location& home = copter.ahrs.get_home();
+                const Location& last_fixed_loc = copter.ahrs.get_gps().location();
+                int32_t bearing_cd = get_bearing_cd(last_fixed_loc, home);
+                Quaternion q;
+                //TODO compensate wind
+                q.from_euler(0.0, ToRad(packet.data[3] * 1.0f), ToRad(bearing_cd / 100.0f));
+                copter.guided_set_angle(q, 10.0, false, 0.5, timeout_ms);
+            }
+            break;
+        }
+
         case 0xDC: //FlyTech mount IMU calibration
         {
             copter.camera_mount.trigger_imu_helper(packet.data[0]);
             break;
         }
+
         default:
             break;
         }
+
         break;
     }
 
@@ -2173,7 +2200,7 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
     case MAVLINK_MSG_ID_SETUP_SIGNING:
         handle_setup_signing(msg);
         break;
-        
+
     }     // end switch
 } // end handle mavlink
 

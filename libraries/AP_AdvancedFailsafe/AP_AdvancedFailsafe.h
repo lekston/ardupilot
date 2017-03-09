@@ -77,6 +77,8 @@ public:
 
     // called to set all outputs to termination state
     virtual void terminate_vehicle(void) = 0;
+
+    virtual void vehicle_gps_loss_specific(void) = 0;
         
 protected:
     // setup failsafe values for if FMU firmware stops running
