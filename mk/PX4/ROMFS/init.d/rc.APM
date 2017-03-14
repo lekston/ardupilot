@@ -266,5 +266,7 @@ else
     sh /etc/init.d/rc.error
 fi
 
+can_lb2
+
 echo "rc.APM finished"
 

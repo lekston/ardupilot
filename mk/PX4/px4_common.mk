@@ -11,6 +11,7 @@ MODULES		+= $(APM_MODULE_DIR)
 #
 # Board support modules
 #
+MODULES		+= drivers/boards/px4fmu-v2
 MODULES		+= drivers/device
 MODULES		+= drivers/stm32
 MODULES		+= drivers/stm32/adc

@@ -13,3 +13,4 @@ MODULES         += lib/mathlib
 MODULES		+= drivers/px4io
 MODULES		+= drivers/px4flow
 MODULES		+= drivers/oreoled
+MODULES		+= examples/can_lb2
