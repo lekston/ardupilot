@@ -43,13 +43,8 @@ void AP_Mount_Alexmos::update()
 
                 retry_getting_params();
             }
+            update_target_from_relative_angles(_angle_ef_target_2x720, _state._retract_angles.get());
 
-            {
-                Vector3f retract_target = Vector3f(0.0f, 0.0f, _frontend._ahrs.yaw*RAD_TO_DEG);
-                retract_target += _state._retract_angles.get();
-
-                update_target_2x720(_angle_ef_target_2x720, retract_target, true, true);
-            }
             control_axis(_angle_ef_target_2x720, true, 1.5f);
             break;
 
@@ -65,13 +60,8 @@ void AP_Mount_Alexmos::update()
                 if(_toggle_output>2) _toggle_output = 0;
 #endif
             }
+            update_target_from_relative_angles(_angle_ef_target_2x720, _state._neutral_angles.get());
 
-            {
-                Vector3f neutral_target = Vector3f(0.0f, 0.0f, _frontend._ahrs.yaw*RAD_TO_DEG);
-                neutral_target += _state._neutral_angles.get();
-
-                update_target_2x720(_angle_ef_target_2x720, neutral_target, true, true);
-            }
             control_axis(_angle_ef_target_2x720, true, 1.5f);
             break;
 
@@ -420,6 +410,14 @@ void AP_Mount_Alexmos::update_target_2x720(Vector3f& current_target, const Vecto
         }
     }
   }
+}
+
+void AP_Mount_Alexmos::update_target_from_relative_angles(Vector3f& current_target, const Vector3f& rel_target)
+{
+    Vector3f new_target = Vector3f(0.0f, 0.0f, _frontend._ahrs.yaw*RAD_TO_DEG);
+    new_target += rel_target;
+
+    update_target_2x720(current_target, new_target, true, true);
 }
 
 /*
