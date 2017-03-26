@@ -11,6 +11,7 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <GCS_MAVLink/GCS.h>
 #include "AP_Mount_Backend.h"
+#include <AP_Common/FT_Common.h>
 
 //definition of the commands id for the Alexmos Serial Protocol
 #define CMD_READ_PARAMS 'R'
@@ -112,6 +113,7 @@ public:
         AP_Mount_Backend(frontend, state, instance),
         _port(NULL),
         _initialised(false),
+        _params_retry_limit(5),
         _board_version(0),
         _current_firmware_version(0.0f),
         _firmware_beta_version(0),
@@ -190,6 +192,9 @@ private:
 
     // get_boardinfo - get board version and firmware version
     void get_boardinfo();
+
+    // request the boardinfo and parameters a few times to ensure that the BGC had time to boot
+    void retry_getting_params();
 
     // control_axis - send new angles to the gimbal at a fixed speed of 30 deg/s
     void control_axis(const Vector3f& angle, bool targets_in_degrees, float boost = 1.0f);
@@ -288,7 +293,7 @@ private:
         uint16_t res1;      //2 Bytes
     };
 
-    // CMD_READ_PARAMS
+    // CMD_READ_PARAMS (Serial spec.: v2.4)
     struct PACKED alexmos_params {
         uint8_t profile_id;
         uint8_t roll_P;
@@ -419,6 +424,8 @@ private:
 
     AP_HAL::UARTDriver *_port;
     bool _initialised : 1;
+
+    uint8_t _params_retry_limit;
 
     // result of the get_boardinfo
     uint8_t _board_version;

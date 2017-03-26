@@ -40,6 +40,8 @@ void AP_Mount_Alexmos::update()
                 // H1_RAW: compensate NORTH once
                 compensate_mount_imu(AP_MOUNT_ALEXMOS_COMPENSATE_NORTH);
                 _last_imu_corr_ms = AP_HAL::millis();
+
+                retry_getting_params();
             }
 
             {
@@ -170,6 +172,8 @@ void AP_Mount_Alexmos::trigger_imu_helper(uint8_t mntCal)
     compensate_mount_imu(mntCal);
 #endif
     _last_imu_corr_ms = AP_HAL::millis();
+
+    retry_getting_params();
 }
 
 // camera rig parameters (FlyTech observation setup)
@@ -442,6 +446,19 @@ void AP_Mount_Alexmos::get_boardinfo()
     }
     uint8_t data[1] = {(uint8_t)1};
     send_command(CMD_BOARD_INFO, data, 1);
+}
+
+void AP_Mount_Alexmos::retry_getting_params()
+{
+    if (_params_retry_limit) // try to get any missing parameters
+    {
+        _params_retry_limit--;
+        if (!_board_version)
+            get_boardinfo();
+
+        if (!_param_read_once)
+            read_params(0);
+    }
 }
 
 /*
