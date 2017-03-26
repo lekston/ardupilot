@@ -2,6 +2,7 @@
 #include "version.h"
 
 #include "GCS_Mavlink.h"
+#include <AP_Common/FT_Common.h>
 
 // default sensors are present and healthy: gyro, accelerometer, barometer, rate_control, attitude_stabilization, yaw_position, altitude control, x/y position control, motor_control
 #define MAVLINK_SENSOR_PRESENT_DEFAULT (MAV_SYS_STATUS_SENSOR_3D_GYRO | MAV_SYS_STATUS_SENSOR_3D_ACCEL | MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE | MAV_SYS_STATUS_SENSOR_ANGULAR_RATE_CONTROL | MAV_SYS_STATUS_SENSOR_ATTITUDE_STABILIZATION | MAV_SYS_STATUS_SENSOR_YAW_POSITION | MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL | MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL | MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS | MAV_SYS_STATUS_AHRS)
@@ -1209,14 +1210,14 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
 
         switch(packet.type) {
 
-        case 0xAC: //FlyTech camera setup
+        case FT_G2A_DATA16_MNT_PAYLOAD_CONTROL:
         {
             copter.camera_mount.set_camera_params(packet.data[0], packet.data[1], \
                                                   packet.data[2], packet.data[3]);
             break;
         }
 
-        case 0xBD:
+        case FT_G2A_DATA16_PROC_DEAD_RECKON:
         {
             /* Dead reckoning
              * data[0] -> enable / disable
@@ -1240,7 +1241,7 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
             break;
         }
 
-        case 0xDC: //FlyTech mount IMU calibration
+        case FT_G2A_DATA16_MNT_IMU_CALIB: //FlyTech mount IMU calibration
         {
             copter.camera_mount.trigger_imu_helper(packet.data[0]);
             break;

@@ -149,9 +149,8 @@ void AP_Mount_Alexmos::status_msg(mavlink_channel_t chan)
     mavlink_msg_mount_status_send(chan, 0, 0, -_current_angle.y*100, roll_n_mode, _current_angle.z*100);
 
     mavlink_data16_t data;
-    mavlink_message_t msg;
 
-    data.type = 0xDD;   //report gimbal mode and other status information
+    data.type = FT_A2G_DATA16_MNT_STATUS_EXT;   //report gimbal mode and other status information
     data.len = 4;
     data.data[0] = (uint8_t)get_mode();
     data.data[1] = (uint8_t)_board_version;      // boardinfo status
