@@ -102,13 +102,27 @@ void AP_Mount_Alexmos::update()
         _last_imu_corr_ms = now;
     }
 
-    get_angles();
+    if (has_pan_control()) {
+        get_angles();
+    }
 }
 
 // has_pan_control - returns true if this mount can control it's pan (required for multicopters)
 bool AP_Mount_Alexmos::has_pan_control() const
 {
-    return _gimbal_3axis;
+    bool pan_output_enabled = _state._stab_pan; // use APM params as default
+
+    if (_param_read_once) {
+        // if SBGC params are available verify that output is configured at the corresponding channel
+        pan_output_enabled = (_current_parameters.params.output_yaw == 3);
+    }
+
+    if (_board_version != 0) {
+        // if SBGC boardinfo has been read then use it
+        pan_output_enabled &= _gimbal_3axis;
+    }
+
+    return pan_output_enabled;
 }
 
 // set_mode - sets mount's mode
@@ -291,6 +305,11 @@ void AP_Mount_Alexmos::set_ahrs_helper(uint8_t mode, const Vector3f& zenith, con
  */
 float AP_Mount_Alexmos::compensate_mount_imu(uint8_t mntCal_mode)
 {
+    if (!has_pan_control()) {
+        // avoid heavy computations for 1- and 2-axis mounts
+        return 0.0f;
+    }
+
     // AHRS DCM row a corresponds to north direction in vehicle body frame
     // AHRS DCM row c corresponds to nadir direction in vehicle body frame
     // NOTE: Alexmos uses (East, North, Up) frame while APM uses NED
