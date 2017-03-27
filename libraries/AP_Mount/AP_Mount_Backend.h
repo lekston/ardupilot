@@ -80,6 +80,9 @@ public:
     // mount IMU helper mode (FlyTech observation setup)
     virtual void trigger_imu_helper(uint8_t mntCal) {}
 
+    // setup mount IMU helper mode
+    virtual void configure_regular_imu_helper(uint8_t mode, uint8_t interval) {}
+
     // camera rig parameters (FlyTech observation setup)
     virtual void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect) {}
 

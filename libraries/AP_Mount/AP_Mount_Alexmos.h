@@ -158,8 +158,8 @@ public:
     // camera rig parameters (FlyTech observation setup)
     virtual void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect);
 
-    // configure correction interval and correciton mode
-    void configure_regular_imu_corr();
+    // configure correction interval and correction mode
+    virtual void configure_regular_imu_helper(uint8_t mode, uint8_t interval);
 
 #if DEBUG_MOUNT
     // provide debug output to console

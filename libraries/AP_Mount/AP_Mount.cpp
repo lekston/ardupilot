@@ -650,6 +650,13 @@ void AP_Mount::trigger_imu_helper(uint8_t mntCal)
     }
 }
 
+void AP_Mount::configure_regular_imu_helper(uint8_t mode, uint8_t interval)
+{
+    if (_backends[0] != NULL) {
+        _backends[0]->configure_regular_imu_helper(mode, interval);
+    }
+}
+
 void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect)
 {
     if (_backends[0] != NULL) {

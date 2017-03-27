@@ -1244,6 +1244,10 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
         case FT_G2A_DATA16_MNT_IMU_CALIB: //FlyTech mount IMU calibration
         {
             copter.camera_mount.trigger_imu_helper(packet.data[0]);
+
+            if (packet.data[1] == 0xFF) {   //accept config for regular corrections
+                copter.camera_mount.configure_regular_imu_helper(packet.data[2], packet.data[3]);
+            }
             break;
         }
 

@@ -130,9 +130,6 @@ void AP_Mount_Alexmos::set_mode(enum MAV_MOUNT_MODE mode)
 {
     // record the mode change and return success
     _state._mode = mode;
-
-    // refresh regular imu correction type and interval
-    configure_regular_imu_corr();
 }
 
 // status_msg - called to allow mounts to send their status to GCS using the MOUNT_STATUS message
@@ -181,15 +178,12 @@ void AP_Mount_Alexmos::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8
 }
 
 
-void AP_Mount_Alexmos::configure_regular_imu_corr()
+void AP_Mount_Alexmos::configure_regular_imu_helper(uint8_t mode, uint8_t interval)
 {
-    // NOTE: currently called only on Mount mode change
-    // XXX TEMPORARY DEPENDENCY on MNT_JSTICK_SPD
-    _regular_imu_corr_mode = (_frontend._joystick_speed % 10) % 4; // 0, 1, 2, 3
+    _regular_imu_corr_mode = mode < 4 ? mode : AP_MOUNT_ALEXMOS_COMPENSATE_NO_OP;
 
-    _imu_corr_interval_ms = (_frontend._joystick_speed % 100)/10;
-    _imu_corr_interval_ms = 1000 + _imu_corr_interval_ms*2000; // i.e.: 101..103 is 1sec, 121..123 is 5sec, etc.
-    // XXX TEMPORARY DEPENDENCY on MNT_JSTICK_SPD
+    _imu_corr_interval_ms = 1000;                      // min. 1 sec
+    _imu_corr_interval_ms += 1000 * MAX(interval, 60); // max. 1 min
 
 #if DEBUG_MOUNT
     if (_regular_imu_corr_mode) // AP_MOUNT_ALEXMOS_COMPENSATE_NO_OP == 0
