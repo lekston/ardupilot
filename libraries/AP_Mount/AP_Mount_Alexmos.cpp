@@ -19,10 +19,7 @@ void AP_Mount_Alexmos::update()
         return;
     }
 
-  if ((_state._roll_angle_max & ENABLE_FUNCTION_A) == ENABLE_FUNCTION_A)
-  {
     read_incoming(); // read the incoming messages from the gimbal
-  }
 
     bool mode_transition = false;
     enum MAV_MOUNT_MODE mount_mode = get_mode();
@@ -105,11 +102,7 @@ void AP_Mount_Alexmos::update()
         _last_imu_corr_ms = now;
     }
 
-  if ((_state._roll_angle_max & ENABLE_FUNCTION_D) == ENABLE_FUNCTION_D)
-  {
     get_angles();
-  }
-
 }
 
 // has_pan_control - returns true if this mount can control it's pan (required for multicopters)
@@ -373,8 +366,6 @@ float AP_Mount_Alexmos::compensate_mount_imu(uint8_t mntCal_mode)
  */
 void AP_Mount_Alexmos::update_target_2x720(Vector3f& current_target, const Vector3f& new_target, bool is_earth_fixed, bool invert_pitch, bool is_control_input)
 {
-  if ((_state._roll_angle_max & ENABLE_FUNCTION_B) == ENABLE_FUNCTION_B)
-  {
     current_target.x = new_target.x;
 
     float tilt_target = invert_pitch ? -new_target.y : new_target.y;
@@ -409,7 +400,6 @@ void AP_Mount_Alexmos::update_target_2x720(Vector3f& current_target, const Vecto
             _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*2.f;
         }
     }
-  }
 }
 
 void AP_Mount_Alexmos::update_target_from_relative_angles(Vector3f& current_target, const Vector3f& rel_target)
@@ -464,9 +454,6 @@ void AP_Mount_Alexmos::retry_getting_params()
 */
 void AP_Mount_Alexmos::control_axis(const Vector3f& angle, bool target_in_degrees, float boost)
 {
-  if ((_state._roll_angle_max & ENABLE_FUNCTION_C) == ENABLE_FUNCTION_C)
-  {
-
     // convert to degrees if necessary
     Vector3f target_deg = angle;
     if (!target_in_degrees) {
@@ -499,7 +486,6 @@ void AP_Mount_Alexmos::control_axis(const Vector3f& angle, bool target_in_degree
     outgoing_buffer.angle_speed.speed_yaw = boost * DEGREE_PER_SEC_TO_VALUE(pan_rate_dem);
     outgoing_buffer.angle_speed.angle_yaw = DEGREE_TO_VALUE(target_deg.z);
     send_command(CMD_CONTROL, (uint8_t *)&outgoing_buffer.angle_speed, sizeof(alexmos_angles_speed));
-  }
 }
 
 /*
