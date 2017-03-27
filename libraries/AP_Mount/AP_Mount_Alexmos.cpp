@@ -401,23 +401,10 @@ void AP_Mount_Alexmos::update_target_2x720(Vector3f& current_target, const Vecto
     current_target.z = wrap_2x720(current_target.z + yaw_error);
 
     if (is_control_input) {
-        int16_t opt = (int16_t)(_state._tilt_angle_max) % 4;
-        const float freq = 20.f;
-
-        if (opt == 0) {
-            // compute average from last 10 errors (for speed demand)
-            _pan_err_rate_avg = 0.9f * _pan_err_rate_avg + 0.1f * yaw_error * freq;
-            _tilt_err_rate_avg = 0.9f * _tilt_err_rate_avg + 0.1f * tilt_error * freq;
-        } else if (opt == 1) {
-            _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*0.5f;
-            _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*0.5f;
-        } else if (opt == 2) {
-            _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED;
-            _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED;
-        } else if (opt == 3) {
-            _pan_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*2.f;
-            _tilt_err_rate_avg = AP_MOUNT_ALEXMOS_SPEED*2.f;
-        }
+        const float freq = 50.f; // 50Hz
+        // compute average from last 10 errors (for speed demand)
+        _pan_err_rate_avg = 0.95f * _pan_err_rate_avg + 0.05f * yaw_error * freq;
+        _tilt_err_rate_avg = 0.95f * _tilt_err_rate_avg + 0.05f * tilt_error * freq;
     }
 }
 
@@ -497,6 +484,7 @@ void AP_Mount_Alexmos::control_axis(const Vector3f& angle, bool target_in_degree
     */
 
     alexmos_parameters outgoing_buffer;
+    // XXX When using MODE_ANGLE, commanded speed entries are most likely ignored
     outgoing_buffer.angle_speed.mode = AP_MOUNT_ALEXMOS_MODE_ANGLE;
     outgoing_buffer.angle_speed.speed_roll = DEGREE_PER_SEC_TO_VALUE(AP_MOUNT_ALEXMOS_SPEED);
     outgoing_buffer.angle_speed.angle_roll = DEGREE_TO_VALUE(target_deg.x);
