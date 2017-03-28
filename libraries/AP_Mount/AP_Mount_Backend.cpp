@@ -42,6 +42,12 @@ void AP_Mount_Backend::control_msg(mavlink_message_t *msg)
     control((int32_t)packet.input_a, (int32_t)packet.input_b, (int32_t)packet.input_c, _state._mode);
 }
 
+// get LightBridge2 zoom button positions
+int16_t AP_Mount_Backend::get_zoom(uint8_t idx)
+{
+    return hal.rcin->read(idx);
+}
+
 void AP_Mount_Backend::control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_t yaw_or_alt, MAV_MOUNT_MODE mount_mode)
 {
     _frontend.set_mode(_instance, mount_mode);
