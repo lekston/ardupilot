@@ -301,6 +301,12 @@ const AP_Param::Info Copter::var_info[] = {
     // @Increment: 1
     GSCALAR(throttle_deadzone,  "THR_DZ",    THR_DZ_DEFAULT),
 
+    // @Param: FLTMODE_CH
+    // @DisplayName: Flightmode channel
+    // @Description: RC Channel to use for flight mode control
+    // @User: Advanced
+    GSCALAR(flight_mode_channel,    "FLTMODE_CH",     FLIGHT_MODE_CHANNEL),
+
     // @Param: FLTMODE1
     // @DisplayName: Flight Mode 1
     // @Description: Flight mode when Channel 5 pwm is <= 1230
