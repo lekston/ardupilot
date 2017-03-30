@@ -2,9 +2,11 @@
 
 #define CONTROL_SWITCH_DEBOUNCE_TIME_MS  200
 
+//TODO Use redirection table to clean-up this mess with handling the ch#_option
+
 //Documentation of Aux Switch Flags:
 struct {
-    uint8_t CH6_flag    : 2; // 0, 1    // ch6 aux switch : 0 is low or false, 1 is center or true, 2 is high
+    uint8_t CH5_flag    : 2; // 0, 1    // ch5 aux switch : 0 is low or false, 1 is center or true, 2 is high
     uint8_t CH7_flag    : 2; // 2, 3    // ch7 aux switch : 0 is low or false, 1 is center or true, 2 is high
     uint8_t CH8_flag    : 2; // 4, 5    // ch8 aux switch : 0 is low or false, 1 is center or true, 2 is high
     uint8_t CH9_flag    : 2; // 6, 7    // ch9 aux switch : 0 is low or false, 1 is center or true, 2 is high
@@ -19,11 +21,12 @@ void Copter::read_control_switch()
 
     // calculate position of flight mode switch
     int8_t switch_position;
-    if      (g.rc_5.get_radio_in() < 1231) switch_position = 0;
-    else if (g.rc_5.get_radio_in() < 1361) switch_position = 1;
-    else if (g.rc_5.get_radio_in() < 1491) switch_position = 2;
-    else if (g.rc_5.get_radio_in() < 1621) switch_position = 3;
-    else if (g.rc_5.get_radio_in() < 1750) switch_position = 4;
+    uint16_t pulsewidth = hal.rcin->read(g.flight_mode_channel - 1);
+    if      (pulsewidth < 1231) switch_position = 0;
+    else if (pulsewidth < 1361) switch_position = 1;
+    else if (pulsewidth < 1491) switch_position = 2;
+    else if (pulsewidth < 1621) switch_position = 3;
+    else if (pulsewidth < 1750) switch_position = 4;
     else switch_position = 5;
 
     // store time that switch last moved
@@ -72,8 +75,11 @@ void Copter::read_control_switch()
 // check_if_auxsw_mode_used - Check to see if any of the Aux Switches are set to a given mode.
 bool Copter::check_if_auxsw_mode_used(uint8_t auxsw_mode_check)
 {
-    bool ret = g.ch7_option == auxsw_mode_check || g.ch8_option == auxsw_mode_check || g.ch9_option == auxsw_mode_check 
-                || g.ch10_option == auxsw_mode_check || g.ch11_option == auxsw_mode_check || g.ch12_option == auxsw_mode_check;
+    bool ret = (g.ch5_option == auxsw_mode_check && g.flight_mode_channel != 5) || \
+               (g.ch7_option == auxsw_mode_check && g.flight_mode_channel != 7) || \
+               (g.ch8_option == auxsw_mode_check && g.flight_mode_channel != 8) || \
+               g.ch9_option == auxsw_mode_check  || g.ch10_option == auxsw_mode_check || \
+               g.ch11_option == auxsw_mode_check || g.ch12_option == auxsw_mode_check;
 
     return ret;
 }
@@ -82,6 +88,7 @@ bool Copter::check_if_auxsw_mode_used(uint8_t auxsw_mode_check)
 bool Copter::check_duplicate_auxsw(void)
 {
     uint8_t auxsw_option_counts[AUXSW_SWITCH_MAX] = {};
+    auxsw_option_counts[g.ch5_option]++;
     auxsw_option_counts[g.ch7_option]++;
     auxsw_option_counts[g.ch8_option]++;
     auxsw_option_counts[g.ch9_option]++;
@@ -124,6 +131,17 @@ void Copter::read_aux_switches()
         return;
     }
 
+    // check if ch5 switch has changed position
+    switch_position = read_3pos_switch(g.rc_5.get_radio_in());
+    if (aux_con.CH5_flag != switch_position) {
+        // set the CH5 flag
+        aux_con.CH5_flag = switch_position;
+
+        // invoke the appropriate function
+        if (g.flight_mode_channel != 5)
+            do_aux_switch_function(g.ch5_option, aux_con.CH5_flag);
+    }
+
     // check if ch7 switch has changed position
     switch_position = read_3pos_switch(g.rc_7.get_radio_in());
     if (aux_con.CH7_flag != switch_position) {
@@ -131,7 +149,8 @@ void Copter::read_aux_switches()
         aux_con.CH7_flag = switch_position;
 
         // invoke the appropriate function
-        do_aux_switch_function(g.ch7_option, aux_con.CH7_flag);
+        if (g.flight_mode_channel != 7)
+            do_aux_switch_function(g.ch7_option, aux_con.CH7_flag);
     }
 
     // check if Ch8 switch has changed position
@@ -141,7 +160,8 @@ void Copter::read_aux_switches()
         aux_con.CH8_flag = switch_position;
 
         // invoke the appropriate function
-        do_aux_switch_function(g.ch8_option, aux_con.CH8_flag);
+        if (g.flight_mode_channel != 8)
+            do_aux_switch_function(g.ch8_option, aux_con.CH8_flag);
     }
 
     // check if Ch9 switch has changed position
@@ -190,7 +210,8 @@ void Copter::read_aux_switches()
 // init_aux_switches - invoke configured actions at start-up for aux function where it is safe to do so
 void Copter::init_aux_switches()
 {
-    // set the CH7 ~ CH12 flags
+    // set the CH5 & CH7 ~ CH12 flags
+    aux_con.CH5_flag = read_3pos_switch(g.rc_5.get_radio_in());
     aux_con.CH7_flag = read_3pos_switch(g.rc_7.get_radio_in());
     aux_con.CH8_flag = read_3pos_switch(g.rc_8.get_radio_in());
     aux_con.CH10_flag = read_3pos_switch(g.rc_10.get_radio_in());
@@ -201,8 +222,22 @@ void Copter::init_aux_switches()
     aux_con.CH12_flag = read_3pos_switch(g.rc_12.get_radio_in());
 
     // initialise functions assigned to switches
-    init_aux_switch_function(g.ch7_option, aux_con.CH7_flag);
-    init_aux_switch_function(g.ch8_option, aux_con.CH8_flag);
+    if (g.flight_mode_channel != 5) {
+        init_aux_switch_function(g.ch5_option, aux_con.CH5_flag);
+    } else {
+        cliSerial->printf("Cannot use RC5 as both FLTMODE and AUX: Using as FLTMODE.\n");
+    }
+    if (g.flight_mode_channel != 7) {
+        init_aux_switch_function(g.ch7_option, aux_con.CH7_flag);
+    } else {
+        cliSerial->printf("Cannot use RC7 as both FLTMODE and AUX: Using as FLTMODE.\n");
+    }
+    if (g.flight_mode_channel != 8) {
+        init_aux_switch_function(g.ch8_option, aux_con.CH8_flag);
+    } else {
+        cliSerial->printf("Cannot use RC8 as both FLTMODE and AUX: Using as FLTMODE.\n");
+    }
+
     init_aux_switch_function(g.ch10_option, aux_con.CH10_flag);
     init_aux_switch_function(g.ch11_option, aux_con.CH11_flag);
 

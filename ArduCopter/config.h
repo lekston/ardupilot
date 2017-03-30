@@ -327,7 +327,16 @@
 
 //////////////////////////////////////////////////////////////////////////////
 // FLIGHT_MODE
+// FLIGHT_MODE_CHANNEL
 //
+#ifndef FLIGHT_MODE_CHANNEL
+ # define FLIGHT_MODE_CHANNEL    5
+#endif
+#if (FLIGHT_MODE_CHANNEL != 5) && (FLIGHT_MODE_CHANNEL != 6) && (FLIGHT_MODE_CHANNEL != 7) && (FLIGHT_MODE_CHANNEL != 8)
+ # error XXX
+ # error XXX You must set FLIGHT_MODE_CHANNEL to 5, 6, 7 or 8
+ # error XXX
+#endif
 
 #ifndef FLIGHT_MODE_1
  # define FLIGHT_MODE_1                  STABILIZE
