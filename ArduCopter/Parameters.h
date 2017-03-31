@@ -239,7 +239,7 @@ public:
         k_param_optflow_enabled,    // deprecated
         k_param_fs_batt_voltage,
         k_param_ch7_option,
-        k_param_auto_slew_rate,     // deprecated - can be deleted
+        k_param_ch5_option,
         k_param_rangefinder_type_old,     // deprecated
         k_param_super_simple = 155,
         k_param_axis_enabled = 157, // deprecated - remove with next eeprom number change
@@ -443,6 +443,7 @@ public:
     AP_Int16        radio_tuning_high;
     AP_Int16        radio_tuning_low;
     AP_Int8         frame_orientation;
+    AP_Int8         ch5_option;
     AP_Int8         ch7_option;
     AP_Int8         ch8_option;
     AP_Int8         ch9_option;
