@@ -400,6 +400,7 @@ AP_Mount::AP_Mount(const AP_AHRS_TYPE &ahrs, const struct Location &current_loc)
     _zoomOut_idx(0),
     _prev_zoom_spd(0),
     _last_zoom_msg_ms(0),
+    _enforce_local_zoom_ctr(false),
     _num_instances(0),
     _primary(0)
 {
@@ -678,6 +679,8 @@ void AP_Mount::configure_regular_imu_helper(uint8_t mode, uint8_t interval)
 
 void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect)
 {
+    if (_enforce_local_zoom_ctr) return;
+
     if (_backends[0] != NULL) {
         _backends[0]->set_camera_params(zoomSpd, recShut, flir, srcSelect);
     }
@@ -691,8 +694,11 @@ void AP_Mount::set_camera_params_from_rc()
     const int16_t threshold = 1700; // LB2 backbuttons default 1514, pressed 1850
     const int8_t step = 2;
 
+    _enforce_local_zoom_ctr = false; // by default GCS is allowed to control zoom
+
     // read zoom control inputs
-    if (_zoomIn_idx && _zoomOut_idx) {
+    if (_zoomIn_idx && _zoomOut_idx)
+    {
         //both channels
         int16_t zoomIn = 0;
         int16_t zoomOut = 0;
@@ -712,10 +718,15 @@ void AP_Mount::set_camera_params_from_rc()
 
         // limit rate to 5Hz
         uint32_t now = AP_HAL::millis();
-        if ((_prev_zoom_spd != spd) && (_last_zoom_msg_ms + 200 < now)) {
-            set_camera_params(spd, 0, 0, 0);
-            _prev_zoom_spd = spd;
-            _last_zoom_msg_ms = now;
+        if (spd != 0) 
+        {
+            _enforce_local_zoom_ctr = true;
+            if (_last_zoom_msg_ms + 200 < now)
+            {
+                set_camera_params(spd, 0, 0, 0);
+                _prev_zoom_spd = spd;
+                _last_zoom_msg_ms = now;
+            } 
         }
     }
 #endif //DUAL_CH_ZOOM_CTRL

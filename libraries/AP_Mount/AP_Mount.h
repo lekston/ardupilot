@@ -165,6 +165,8 @@ protected:
     uint8_t             _zoomOut_idx;
     uint8_t             _prev_zoom_spd;
     uint32_t            _last_zoom_msg_ms;
+    bool                _enforce_local_zoom_ctr;    // says if GCS is allowed to control Zoom
+
     uint8_t             _num_instances;     // number of mounts instantiated
     uint8_t             _primary;           // primary mount
     AP_Mount_Backend    *_backends[AP_MOUNT_MAX_INSTANCES];         // pointers to instantiated mounts
