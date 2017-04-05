@@ -1219,25 +1219,14 @@ void GCS_MAVLINK_Copter::handleMessage(mavlink_message_t* msg)
 
         case FT_G2A_DATA16_PROC_DEAD_RECKON:
         {
-            /* Dead reckoning
-             * data[0] -> enable / disable
-             * data[1] -> time in minutes
-             * data[2] -> roll in deg
-             * data[3] -> pitch in deg
-             */
+            // store & arm Emergency return home setup from GCS
+            copter.g2.afs.init_gps_loss_specific(packet.data);
+
             if( packet.data[0] )
             {
-                const uint32_t timeout_ms = packet.data[1] * 60 * 1000;
-                copter.set_mode(GUIDED_NOGPS, MODE_REASON_GCS_COMMAND);
-                //const Vector3f wind = copter.ahrs.wind_estimate();
-                const Location& home = copter.ahrs.get_home();
-                const Location& last_fixed_loc = copter.ahrs.get_gps().location();
-                int32_t bearing_cd = get_bearing_cd(last_fixed_loc, home);
-                Quaternion q;
-                //TODO compensate wind
-                q.from_euler(0.0, ToRad(packet.data[3] * 1.0f), ToRad(bearing_cd / 100.0f));
-                copter.guided_set_angle(q, 10.0, false, 0.5, timeout_ms);
-            }
+                // execute Emergency return home setup
+                copter.g2.afs.vehicle_gps_loss_specific();
+            } 
             break;
         }
 

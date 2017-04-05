@@ -23,13 +23,14 @@
 
 /**
   * @brief Dead reckoning
-  * @param 0 enable / disable
+  * @param 0 enable / disable                   (set to 0 for afs setup messages)
   * @param 1 timeout [min]
-  * @param 2 roll angle [deg]
-  * @param 3 pitch angle [deg]
-  * @param 4 wind dir MSB
-  * @param 5 wind dir LSB [deg]
+  * @param 2 roll angle demand [deg]
+  * @param 3 pitch angle demand [deg]
+  * @param 4 wind dir MSB                       (4,5: must add up to <0, 360> deg range)
+  * @param 5 wind dir LSB [deg]                 (where from the wind is blowing)
   * @param 6 wind speed [m/s]
+  * @param 7 airspeed estimate [m/s]            (non-zero speed value arms the afs)
   */
 #define FT_G2A_DATA16_PROC_DEAD_RECKON      0x03 //0xBD
 

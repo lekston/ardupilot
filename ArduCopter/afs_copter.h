@@ -21,6 +21,13 @@
 #if ADVANCED_FAILSAFE == ENABLED
 #include <AP_AdvancedFailsafe/AP_AdvancedFailsafe.h>
 
+struct DR_Results {
+    float WindCorrAngle;
+    float GndSpd;
+    float CrossWind;
+    float TailWind;
+}; // Dead Reckon results
+
 /*
   a plane specific AP_AdvancedFailsafe class
  */
@@ -31,8 +38,12 @@ public:
 
     // called to set all outputs to termination state
     void terminate_vehicle(void);
+
+    void init_gps_loss_specific(uint8_t data[]);
     
     void vehicle_gps_loss_specific(void);
+
+    struct DR_Results get_wind_corr(float bearing, float airspeed, float wind_dir, float wind_spd);
 
 protected:
     // setup failsafe values for if FMU firmware stops running
@@ -40,6 +51,14 @@ protected:
 
     // return the AFS mapped control mode
     enum control_mode afs_mode(void);
+
+private:
+
+    // data for emergency return home
+    uint8_t     _air_spd;
+    uint16_t    _wind_dir;
+    uint8_t     _wind_spd;
+    float       _pitch_dem;
 };
 
 #endif // ADVANCED_FAILSAFE
