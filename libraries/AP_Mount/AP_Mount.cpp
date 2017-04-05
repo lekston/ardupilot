@@ -718,7 +718,7 @@ void AP_Mount::set_camera_params_from_rc()
 
         // limit rate to 5Hz
         uint32_t now = AP_HAL::millis();
-        if (spd != 0) 
+        if ((spd != 0) || (_prev_zoom_spd != spd))
         {
             _enforce_local_zoom_ctr = true;
             if (_last_zoom_msg_ms + 200 < now)
