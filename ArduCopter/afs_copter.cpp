@@ -8,7 +8,11 @@
 
 // Constructor
 AP_AdvancedFailsafe_Copter::AP_AdvancedFailsafe_Copter(AP_Mission &_mission, AP_Baro &_baro, const AP_GPS &_gps, const RCMapper &_rcmap) :
-    AP_AdvancedFailsafe(_mission, _baro, _gps, _rcmap)
+    AP_AdvancedFailsafe(_mission, _baro, _gps, _rcmap),
+    _air_spd(0),
+    _wind_dir(0),
+    _wind_spd(0),
+    _pitch_dem(0)
 {}
 
 
@@ -69,18 +73,60 @@ AP_AdvancedFailsafe::control_mode AP_AdvancedFailsafe_Copter::afs_mode(void)
     return AP_AdvancedFailsafe::AFS_STABILIZED;
 }
 
+void AP_AdvancedFailsafe_Copter::init_gps_loss_specific(uint8_t data[])
+{
+    // decode as per FT_Common.h definition
+    // non-zero speed value arms the afs emergency return home
+    _air_spd  = (uint8_t)constrain_int16(data[7], 0, 15); // limit airspeed speed
+    _wind_dir = ((uint16_t)data[4] << 8) + data[5];       // direction in <0, 360> deg range
+    _wind_spd = (uint8_t)constrain_int16(data[6], 0, 10); // limit wind speed
+
+    // ignore roll demand in data[2] as for wind correction code roll must be kept at zero
+    _pitch_dem = constrain_int16(-data[3], -30, -5);
+}
+
 void AP_AdvancedFailsafe_Copter::vehicle_gps_loss_specific(void)
 {
-	const uint32_t timeout_ms = 1 * 60 * 1000;
-	copter.set_mode(GUIDED_NOGPS, MODE_REASON_GCS_COMMAND);
-//	const Vector3f wind = copter.ahrs.wind_estimate();
-	const Location& home = copter.ahrs.get_home();
-	const Location& last_fixed_loc = copter.ahrs.get_gps().location();
-	int32_t bearing_cd = get_bearing_cd(last_fixed_loc, home);
-	Quaternion q;
-	//TODO compensate wind
-	q.from_euler(0.0, ToRad(-10.0f), ToRad(bearing_cd / 100.0f));
-	copter.guided_set_angle(q, 10.0, false, 0.5, timeout_ms);
+    if (_air_spd && (_wind_dir <=360)) // only use emergency procedure when it is armed and valid
+    {
+        const uint32_t timeout_ms = 1 * 60 * 1000;
+        copter.set_mode(GUIDED_NOGPS, MODE_REASON_GCS_COMMAND);
+
+        const Location& home = copter.ahrs.get_home();
+        const Location& last_fixed_loc = copter.ahrs.get_gps().location();
+        int32_t bearing_cd = get_bearing_cd(last_fixed_loc, home);
+
+        DR_Results res = get_wind_corr(0.01f * bearing_cd, _air_spd, _wind_dir, _wind_spd);
+
+        float yaw_dem = wrap_360(0.01f * bearing_cd + res.WindCorrAngle);
+
+        Quaternion q;
+        q.from_euler(0.0, ToRad(_pitch_dem), ToRad(yaw_dem));
+        copter.guided_set_angle(q, 10.0, false, 0.0, timeout_ms);
+    }
+}
+
+/*
+ * Conventions & units:
+ * - bearing and wind_dir are in degrees
+ * - positive crosswind is to the right (blows along Y axis)
+ * - positive tailwind increases ground speed (blows along X axis)
+ * - negative tailwind is headwind
+ */
+struct DR_Results AP_AdvancedFailsafe_Copter::get_wind_corr(float bearing, float airspeed, float wind_dir, float wind_spd)
+{
+    struct DR_Results results;
+
+    float wta = ToRad(wrap_180(bearing - wind_dir)); // wind dir to track angle
+
+    results.CrossWind = wind_spd * sinf(wta);
+    results.TailWind = -wind_spd * cosf(wta);
+
+    float wca = -asinf(results.CrossWind / airspeed); // radians
+    results.WindCorrAngle = ToDeg(wca);
+    results.GndSpd = airspeed * cosf(wca) + results.TailWind;
+
+    return results;
 }
 
 #endif // ADVANCED_FAILSAFE

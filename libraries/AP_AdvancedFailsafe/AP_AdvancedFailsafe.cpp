@@ -219,11 +219,10 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
         if (!gps_lock_ok) {
             GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, "State GPS_LOSS");
             _state = STATE_GPS_LOSS;
-//            if (_wp_gps_loss) {
-//                _saved_wp = mission.get_current_nav_cmd().index;
-//                mission.set_current_cmd(_wp_gps_loss);
-//            }
-            vehicle_gps_loss_specific();
+            if (_wp_gps_loss) {
+                _saved_wp = mission.get_current_nav_cmd().index;
+                mission.set_current_cmd(_wp_gps_loss);
+            }            
             // if two events happen within 30s we consider it to be part of the same event
             if (now - _last_gps_loss_ms > 30*1000UL) {
                 _gps_loss_count++;
@@ -242,6 +241,11 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
                     GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, "Dual loss TERMINATE");
                     _terminate.set_and_notify(1); /* INACTIVATED */
                 }
+            }
+
+            // if two events happen within 10s we try to execute emergency return home
+            if (now - _last_comms_loss_ms > 10*1000UL) {
+                vehicle_gps_loss_specific(); // executes only if armed from GCS
             }
         } else if (gcs_link_ok) {
             _state = STATE_AUTO;
@@ -263,6 +267,11 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
             if (!_terminate && _enable_dual_loss) {
                 GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, "Dual loss TERMINATE");
                 _terminate.set_and_notify(1); /* INACTIVATED */
+            }
+
+            // if two events happen within 10s we try to execute emergency return home
+            if (now - _last_gps_loss_ms > 10*1000UL) {
+                vehicle_gps_loss_specific(); // executes only if armed from GCS
             }
         } else if (gps_lock_ok) {
             GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, "GPS OK");
