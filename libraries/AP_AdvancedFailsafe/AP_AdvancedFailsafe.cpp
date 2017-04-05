@@ -161,7 +161,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
         if (geofence_breached || check_altlimit()) {
             if (!_terminate) {
                 GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, "Fence TERMINATE");
-                _terminate.set_and_notify(1);
+                _terminate.set_and_notify(1); /* INACTIVATED */
             }
         }
     }
@@ -175,7 +175,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
         _rc_fail_time_seconds > 0 &&
             (AP_HAL::millis() - last_valid_rc_ms) > (_rc_fail_time_seconds * 1000.0f)) {
         GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, "RC failure terminate");
-        _terminate.set_and_notify(1);
+        _terminate.set_and_notify(1); /* INACTIVATED */
     }
     
     // tell the failsafe board if we are in manual control
@@ -240,7 +240,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
             if(_enable_dual_loss) {
                 if (!_terminate) {
                     GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, "Dual loss TERMINATE");
-                    _terminate.set_and_notify(1);
+                    _terminate.set_and_notify(1); /* INACTIVATED */
                 }
             }
         } else if (gcs_link_ok) {
@@ -262,7 +262,7 @@ AP_AdvancedFailsafe::check(uint32_t last_heartbeat_ms, bool geofence_breached, u
             // leads to termination if AFS_DUAL_LOSS is 1
             if (!_terminate && _enable_dual_loss) {
                 GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, "Dual loss TERMINATE");
-                _terminate.set_and_notify(1);
+                _terminate.set_and_notify(1); /* INACTIVATED */
             }
         } else if (gps_lock_ok) {
             GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_INFO, "GPS OK");
@@ -366,6 +366,7 @@ bool AP_AdvancedFailsafe::should_crash_vehicle(void)
         return false;
     }
 
-    // we are crashing
-    return true;
+    // we are NOT crashing (EVER)
+    /* make sure dual loss termination is not supported even if configured */ 
+    return false;
 }
