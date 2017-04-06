@@ -82,7 +82,7 @@ void AP_AdvancedFailsafe_Copter::init_gps_loss_specific(uint8_t data[])
     _wind_spd = (uint8_t)constrain_int16(data[6], 0, 10); // limit wind speed
 
     // ignore roll demand in data[2] as for wind correction code roll must be kept at zero
-    _pitch_dem = constrain_int16(data[3], 5, 25);
+    _pitch_dem = constrain_int16(-data[3], -5, -25);
 }
 
 void AP_AdvancedFailsafe_Copter::vehicle_gps_loss_specific(void)
