@@ -82,7 +82,7 @@ void AP_AdvancedFailsafe_Copter::init_gps_loss_specific(uint8_t data[])
     _wind_spd = (uint8_t)constrain_int16(data[6], 0, 10); // limit wind speed
 
     // ignore roll demand in data[2] as for wind correction code roll must be kept at zero
-    _pitch_dem = constrain_int16(-data[3], -25, -5);
+    _pitch_dem = constrain_int16(-data[3], -30, -5);
 }
 
 void AP_AdvancedFailsafe_Copter::vehicle_gps_loss_specific(void)
@@ -98,11 +98,7 @@ void AP_AdvancedFailsafe_Copter::vehicle_gps_loss_specific(void)
 
         DR_Results res = get_wind_corr(0.01f * bearing_cd, _air_spd, _wind_dir, _wind_spd);
 
-        // XXX the reason minus sign below must be verified
-        float yaw_dem   = wrap_360(0.01f * bearing_cd - res.WindCorrAngle);
-        const int8_t minGndSpd = 5;
-
-        if (res.GndSpd < minGndSpd) _pitch_dem *= 1.2f; //max of 30deg pitch
+        float yaw_dem = wrap_360(0.01f * bearing_cd + res.WindCorrAngle);
 
         Quaternion q;
         q.from_euler(0.0, ToRad(_pitch_dem), ToRad(yaw_dem));
