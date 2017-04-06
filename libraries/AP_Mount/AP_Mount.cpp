@@ -677,9 +677,9 @@ void AP_Mount::configure_regular_imu_helper(uint8_t mode, uint8_t interval)
     }
 }
 
-void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect)
+void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect, bool internal_com)
 {
-    if (_enforce_local_zoom_ctr) return;
+    if (_enforce_local_zoom_ctr && !internal_com) return;
 
     if (_backends[0] != NULL) {
         _backends[0]->set_camera_params(zoomSpd, recShut, flir, srcSelect);
@@ -723,7 +723,7 @@ void AP_Mount::set_camera_params_from_rc()
             _enforce_local_zoom_ctr = true;
             if (_last_zoom_msg_ms + 200 < now)
             {
-                set_camera_params(spd, 0, 0, 0);
+                set_camera_params(spd, 0, 0, 0, true);
                 _prev_zoom_spd = spd;
                 _last_zoom_msg_ms = now;
             } 

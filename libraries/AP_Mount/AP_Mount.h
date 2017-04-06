@@ -140,7 +140,7 @@ public:
     void configure_regular_imu_helper(uint8_t mode, uint8_t interval);
 
     // camera rig parameters (FlyTech observation setup)
-    void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect);
+    void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect, bool internal_com = false);
 
     // read RC and update camera setup
     void set_camera_params_from_rc();
