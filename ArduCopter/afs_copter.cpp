@@ -98,7 +98,8 @@ void AP_AdvancedFailsafe_Copter::vehicle_gps_loss_specific(void)
 
         DR_Results res = get_wind_corr(0.01f * bearing_cd, _air_spd, _wind_dir, _wind_spd);
 
-        float yaw_dem   = 0.01f * bearing_cd + res.WindCorrAngle;
+        // XXX the reason minus sign below must be verified
+        float yaw_dem   = wrap_360(0.01f * bearing_cd - res.WindCorrAngle);
         const int8_t minGndSpd = 5;
 
         if (res.GndSpd < minGndSpd) _pitch_dem *= 1.2f; //max of 30deg pitch
