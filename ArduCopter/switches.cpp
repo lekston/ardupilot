@@ -260,7 +260,7 @@ void Copter::init_aux_switch_function(int8_t ch_option, uint8_t ch_flag)
         case AUXSW_SPRAYER:
         case AUXSW_PARACHUTE_ENABLE:
         case AUXSW_PARACHUTE_3POS:      // we trust the vehicle will be disarmed so even if switch is in release position the chute will not release
-        case AUXSW_RETRACT_MOUNT:
+        case AUXSW_SET_MNT_RC_MODE:
         case AUXSW_MISSION_RESET:
         case AUXSW_ATTCON_FEEDFWD:
         case AUXSW_ATTCON_ACCEL_LIM:
@@ -525,13 +525,13 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
             break;
         
 #if MOUNT == ENABLE
-        case AUXSW_RETRACT_MOUNT:
+        case AUXSW_SET_MNT_RC_MODE:
             switch (ch_flag) {
                 case AUX_SWITCH_HIGH:
-                    camera_mount.set_mode(MAV_MOUNT_MODE_RETRACT);
+                    camera_mount.set_mode(MAV_MOUNT_MODE_RC_TARGETING);
                     break;
                 case AUX_SWITCH_LOW:
-                    camera_mount.set_mode_to_default();
+                    // maintain current mount mode
                     break;
             }
             break;
