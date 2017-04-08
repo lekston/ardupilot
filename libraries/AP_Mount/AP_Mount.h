@@ -142,8 +142,8 @@ public:
     // camera rig parameters (FlyTech observation setup)
     void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect, bool internal_com = false);
 
-    // read RC and update camera setup
-    void set_camera_params_from_rc();
+    // set zoom (using speed commands) 
+    void set_zoom(int8_t z);
 
     // get rotation of the mount with respect to the frame
     bool get_debug_angles(float& roll, float& tilt, float& pan);
@@ -161,8 +161,7 @@ protected:
     AP_Int8             _joystick_speed;    // joystick gain
 
     // front end members
-    uint8_t             _zoomIn_idx;
-    uint8_t             _zoomOut_idx;
+    const int8_t        _zoom_step;
     uint8_t             _prev_zoom_spd;
     uint32_t            _last_zoom_msg_ms;
     bool                _enforce_local_zoom_ctr;    // says if GCS is allowed to control Zoom

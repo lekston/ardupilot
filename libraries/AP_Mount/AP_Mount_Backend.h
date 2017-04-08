@@ -65,9 +65,6 @@ public:
     // control_msg - process MOUNT_CONTROL messages received from GCS
     virtual void control_msg(mavlink_message_t* msg);
 
-    // get LightBridge2 zoom button positions
-    virtual int16_t get_zoom(uint8_t idx);
-
     // status_msg - called to allow mounts to send their status to GCS via MAVLink
     virtual void status_msg(mavlink_channel_t chan) {}
 

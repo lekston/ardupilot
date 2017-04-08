@@ -396,8 +396,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
 AP_Mount::AP_Mount(const AP_AHRS_TYPE &ahrs, const struct Location &current_loc) :
     _ahrs(ahrs),
     _current_loc(current_loc),
-    _zoomIn_idx(0),
-    _zoomOut_idx(0),
+    _zoom_step(2),
     _prev_zoom_spd(0),
     _last_zoom_msg_ms(0),
     _enforce_local_zoom_ctr(false),
@@ -430,18 +429,6 @@ void AP_Mount::init(DataFlash_Class *dataflash, const AP_SerialManager& serial_m
                 state[0]._type.set_and_save(Mount_Type_Servo);
         }
     }
-
-#ifdef DUAL_CH_ZOOM_CTRL
-    // setup LightBridge2 RC zoom control channel mapping
-    if (RC_Channel_aux::function_assigned(RC_Channel_aux::Aux_servo_function_t::k_rcin9) &&
-        RC_Channel_aux::function_assigned(RC_Channel_aux::Aux_servo_function_t::k_rcin10)) {
-        //Channels are fixed
-
-        uint8_t idx_offset = RC_Channel_aux::Aux_servo_function_t::k_rcin1;
-        _zoomIn_idx = RC_Channel_aux::Aux_servo_function_t::k_rcin9-idx_offset;
-        _zoomOut_idx = RC_Channel_aux::Aux_servo_function_t::k_rcin10-idx_offset;
-    }
-#endif // DUAL_CH_ZOOM_CTRL
 
     // primary is reset to the first instantiated mount
     bool primary_set = false;
@@ -501,9 +488,6 @@ void AP_Mount::update()
             _backends[instance]->update();
         }
     }
-
-    // XXX this belongs to the backend I guess
-    set_camera_params_from_rc();
 }
 
 // used for gimbals that need to read INS data at full rate
@@ -686,50 +670,37 @@ void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir,
     }
 }
 
-void AP_Mount::set_camera_params_from_rc()
+void AP_Mount::set_zoom(int8_t z)
 {
-#ifdef DUAL_CH_ZOOM_CTRL
     // LightBridge2 RC control channel runtime/loop
     uint8_t spd = 0;
-    const int16_t threshold = 1700; // LB2 backbuttons default 1514, pressed 1850
-    const int8_t step = 2;
 
-    _enforce_local_zoom_ctr = false; // by default GCS is allowed to control zoom
-
-    // read zoom control inputs
-    if (_zoomIn_idx && _zoomOut_idx)
+    if (z == 0)
     {
-        //both channels
-        int16_t zoomIn = 0;
-        int16_t zoomOut = 0;
-
-        if (_backends[0] != NULL) {
-            zoomIn = _backends[0]->get_zoom(_zoomIn_idx);
-            zoomOut = _backends[0]->get_zoom(_zoomOut_idx);
+        // return early for performance
+        if (_prev_zoom_spd == 0) {
+            _enforce_local_zoom_ctr = false;
+            return;
         }
-
-        if (zoomIn > threshold) {
-            spd += step;
-        }
-        if (zoomOut > threshold) {
-            spd += step;
-            spd |= 0x10;
-        }
-
-        // limit rate to 5Hz
-        uint32_t now = AP_HAL::millis();
-        if ((spd != 0) || (_prev_zoom_spd != spd))
-        {
-            _enforce_local_zoom_ctr = true;
-            if (_last_zoom_msg_ms + 200 < now)
-            {
-                set_camera_params(spd, 0, 0, 0, true);
-                _prev_zoom_spd = spd;
-                _last_zoom_msg_ms = now;
-            } 
-        }
+        // else continue and send zoom speed command of zero (i.e. halt zooming)
     }
-#endif //DUAL_CH_ZOOM_CTRL
+    else
+    {
+        spd = _zoom_step;
+        // encode zoom reverse as per Sony specs.
+        if (z  < 0) spd |= 0x10;
+    }
+
+    _enforce_local_zoom_ctr = true;
+
+    // limit rate to 4Hz
+    uint32_t now = AP_HAL::millis();
+    if (_last_zoom_msg_ms + 250 < now)
+    {
+        set_camera_params(spd, 0, 0, 0, true);
+        _prev_zoom_spd = spd;
+        _last_zoom_msg_ms = now;
+    } 
 }
 
 bool AP_Mount::get_debug_angles(float& roll, float& tilt, float& pan)
