@@ -56,7 +56,7 @@ enum aux_sw_func {
     AUXSW_MISSION_RESET =       24, // Reset auto mission to start from first command
     AUXSW_ATTCON_FEEDFWD =      25, // enable/disable the roll and pitch rate feed forward
     AUXSW_ATTCON_ACCEL_LIM =    26, // enable/disable the roll, pitch and yaw accel limiting
-    AUXSW_RETRACT_MOUNT =       27, // Retract Mount
+    AUXSW_SET_MNT_RC_MODE =     27, // Set rc control mode on the gimbal mount (speed control law)
     AUXSW_RELAY =               28, // Relay pin on/off (only supports first relay)
     AUXSW_LANDING_GEAR =        29, // Landing gear controller
     AUXSW_LOST_COPTER_SOUND =   30, // Play lost copter sound
