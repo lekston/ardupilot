@@ -30,6 +30,7 @@
 
 // maximum number of mounts
 #define AP_MOUNT_MAX_INSTANCES          1
+#define DUAL_CH_ZOOM_CTRL
 
 // declare backend classes
 class AP_Mount_Backend;
@@ -139,7 +140,10 @@ public:
     void configure_regular_imu_helper(uint8_t mode, uint8_t interval);
 
     // camera rig parameters (FlyTech observation setup)
-    void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect);
+    void set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect, bool internal_com = false);
+
+    // set zoom (using speed commands) 
+    void set_zoom(int8_t z);
 
     // get rotation of the mount with respect to the frame
     bool get_debug_angles(float& roll, float& tilt, float& pan);
@@ -157,6 +161,11 @@ protected:
     AP_Int8             _joystick_speed;    // joystick gain
 
     // front end members
+    const int8_t        _zoom_step;
+    uint8_t             _prev_zoom_spd;
+    uint32_t            _last_zoom_msg_ms;
+    bool                _enforce_local_zoom_ctr;    // says if GCS is allowed to control Zoom
+
     uint8_t             _num_instances;     // number of mounts instantiated
     uint8_t             _primary;           // primary mount
     AP_Mount_Backend    *_backends[AP_MOUNT_MAX_INSTANCES];         // pointers to instantiated mounts

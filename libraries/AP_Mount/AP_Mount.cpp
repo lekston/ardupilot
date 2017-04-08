@@ -396,6 +396,10 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
 AP_Mount::AP_Mount(const AP_AHRS_TYPE &ahrs, const struct Location &current_loc) :
     _ahrs(ahrs),
     _current_loc(current_loc),
+    _zoom_step(2),
+    _prev_zoom_spd(0),
+    _last_zoom_msg_ms(0),
+    _enforce_local_zoom_ctr(false),
     _num_instances(0),
     _primary(0)
 {
@@ -657,11 +661,46 @@ void AP_Mount::configure_regular_imu_helper(uint8_t mode, uint8_t interval)
     }
 }
 
-void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect)
+void AP_Mount::set_camera_params(uint8_t zoomSpd, uint8_t recShut, uint8_t flir, uint8_t srcSelect, bool internal_com)
 {
+    if (_enforce_local_zoom_ctr && !internal_com) return;
+
     if (_backends[0] != NULL) {
         _backends[0]->set_camera_params(zoomSpd, recShut, flir, srcSelect);
     }
+}
+
+void AP_Mount::set_zoom(int8_t z)
+{
+    // LightBridge2 RC control channel runtime/loop
+    uint8_t spd = 0;
+
+    if (z == 0)
+    {
+        // return early for performance
+        if (_prev_zoom_spd == 0) {
+            _enforce_local_zoom_ctr = false;
+            return;
+        }
+        // else continue and send zoom speed command of zero (i.e. halt zooming)
+    }
+    else
+    {
+        spd = _zoom_step;
+        // encode zoom reverse as per Sony specs.
+        if (z  < 0) spd |= 0x10;
+    }
+
+    _enforce_local_zoom_ctr = true;
+
+    // limit rate to 4Hz
+    uint32_t now = AP_HAL::millis();
+    if (_last_zoom_msg_ms + 250 < now)
+    {
+        set_camera_params(spd, 0, 0, 0, true);
+        _prev_zoom_spd = spd;
+        _last_zoom_msg_ms = now;
+    } 
 }
 
 bool AP_Mount::get_debug_angles(float& roll, float& tilt, float& pan)

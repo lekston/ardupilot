@@ -624,6 +624,18 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
                 Log_Write_Event(DATA_AVOIDANCE_ADSB_DISABLE);
             }
             break;
+        case AUXSW_ZOOM_BTN_PLUS:
+            if (ch_flag == AUX_SWITCH_HIGH) {
+                // LB2 backbuttons default 1514, pressed 1850
+                camera_mount.set_zoom(1);
+            } else camera_mount.set_zoom(0);
+            break;
+        case AUXSW_ZOOM_BTN_MINS:
+            if (ch_flag == AUX_SWITCH_HIGH) {
+                // LB2 backbuttons default 1514, pressed 1850
+                camera_mount.set_zoom(-1);
+            } else camera_mount.set_zoom(0);
+            break;
     }
 }
 
