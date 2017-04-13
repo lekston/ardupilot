@@ -101,6 +101,10 @@ public:
     void set_mode_to_default() { set_mode_to_default(_primary); }
     void set_mode_to_default(uint8_t instance);
 
+    // toggle_mode - toggles between Retract, Neutral and RC_Targetting (Speed) modes
+    void toggle_mode() { toggle_mode(_primary); }
+    void toggle_mode(uint8_t instance);
+
     // set_angle_targets - sets angle targets in degrees
     void set_angle_targets(float roll, float tilt, float pan) { set_angle_targets(_primary, roll, tilt, pan); }
     void set_angle_targets(uint8_t instance, float roll, float tilt, float pan);

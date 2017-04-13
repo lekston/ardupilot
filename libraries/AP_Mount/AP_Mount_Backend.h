@@ -29,7 +29,9 @@ public:
     AP_Mount_Backend(AP_Mount &frontend, AP_Mount::mount_state& state, uint8_t instance) :
         _frontend(frontend),
         _state(state),
-        _instance(instance)
+        _instance(instance),
+        _last_mode_by_toggle(MAV_MOUNT_MODE_NEUTRAL),
+        _last_toggle_call_time(0)
     {}
 
     // Virtual destructor
@@ -49,6 +51,9 @@ public:
 
     // set_mode - sets mount's mode
     virtual void set_mode(enum MAV_MOUNT_MODE mode) = 0;
+
+    // toggle_mode - toggles between Retract, Neutral and RC_Targetting (Speed) modes
+    virtual void toggle_mode();
 
     // set_angle_targets - sets angle targets in degrees
     virtual void set_angle_targets(float roll, float tilt, float pan);
@@ -108,4 +113,7 @@ protected:
     AP_Mount::mount_state &_state;    // references to the parameters and state for this backend
     uint8_t     _instance;  // this instance's number
     Vector3f    _angle_ef_target_rad;   // desired earth-frame roll, tilt and vehicle-relative pan angles in radians
+
+    enum MAV_MOUNT_MODE _last_mode_by_toggle;
+    uint32_t _last_toggle_call_time;
 };

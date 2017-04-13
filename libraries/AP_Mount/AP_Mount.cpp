@@ -552,6 +552,16 @@ void AP_Mount::set_mode(uint8_t instance, enum MAV_MOUNT_MODE mode)
     _backends[instance]->set_mode(mode);
 }
 
+void AP_Mount::toggle_mode(uint8_t instance)
+{
+    // sanity check instance
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == NULL) {
+        return;
+    }
+
+    _backends[instance]->toggle_mode();
+}
+
 // set_angle_targets - sets angle targets in degrees
 void AP_Mount::set_angle_targets(uint8_t instance, float roll, float tilt, float pan)
 {

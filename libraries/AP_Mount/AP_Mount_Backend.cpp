@@ -2,6 +2,45 @@
 
 extern const AP_HAL::HAL& hal;
 
+// toggle_mode - toggles between Retract, Neutral and RC_Targetting (Speed) modes
+//      This method has no effect if called continuously,
+//      only intermittent calls are executed (separated by no less than 250ms)
+void AP_Mount_Backend::toggle_mode()
+{
+    uint32_t now = AP_HAL::millis();
+
+    // make sure we do not respond to continuous calls (at least 250ms separation required)
+    if (_last_toggle_call_time + 250 < now)
+    {
+        enum MAV_MOUNT_MODE cur_mode = get_mode();
+        enum MAV_MOUNT_MODE next_mode = _last_mode_by_toggle;
+        // by default reset the mode to the last used by toggle
+
+        if (_last_mode_by_toggle == cur_mode)
+        {
+            switch (cur_mode)
+            {
+                case MAV_MOUNT_MODE_RETRACT:
+                    next_mode = MAV_MOUNT_MODE_NEUTRAL;
+                    break;
+                case MAV_MOUNT_MODE_NEUTRAL:
+                    next_mode = MAV_MOUNT_MODE_RC_TARGETING;
+                    break;
+                case MAV_MOUNT_MODE_RC_TARGETING:
+                    next_mode = MAV_MOUNT_MODE_RETRACT;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        _frontend.set_mode(_instance, next_mode);
+        _last_mode_by_toggle = next_mode;
+    }
+
+    _last_toggle_call_time = now;
+}
+
 // set_angle_targets - sets angle targets in degrees
 void AP_Mount_Backend::set_angle_targets(float roll, float tilt, float pan)
 {
