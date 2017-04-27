@@ -124,6 +124,7 @@ public:
         _regular_imu_corr_mode(0x00),
         _pan_err_rate_avg(0.0f),
         _tilt_err_rate_avg(0.0f),
+        _toggle_status_output(false),
 #if DEBUG_MOUNT
         _toggle_output(0),
         _last_debug_output_ms(0),
@@ -450,6 +451,8 @@ private:
 
     float _pan_err_rate_avg;
     float _tilt_err_rate_avg;
+
+    bool _toggle_status_output;
 
 #if DEBUG_MOUNT
     uint8_t _toggle_output;

@@ -141,19 +141,22 @@ void AP_Mount_Alexmos::status_msg(mavlink_channel_t chan)
     // NOTE: this routine is called with the LOWEST possible priority 
     // (hence requests for mount angles were moved elsewhere)
 
-    int32_t roll_n_mode = ((int32_t)(_current_angle.x*100) & (int32_t)(~0xF)) + get_mode();
-    mavlink_msg_mount_status_send(chan, 0, 0, -_current_angle.y*100, roll_n_mode, _current_angle.z*100);
+    if (_toggle_status_output) {
+        mavlink_msg_mount_status_send(chan, 0, 0, -_current_angle.y*100,
+                                     _current_angle.x*100, _current_angle.z*100);
+    } else {
+        mavlink_data16_t data;
+        data.type = FT_A2G_DATA16_MNT_STATUS_EXT;   //report gimbal mode and other status information
+        data.len = 4;
+        data.data[0] = (uint8_t)get_mode();
+        data.data[1] = (uint8_t)_board_version;      // boardinfo status
+        data.data[2] = (uint8_t)_param_read_once;    // parameter status
+        data.data[3] = (uint8_t)has_pan_control();
 
-    mavlink_data16_t data;
+        mavlink_msg_data16_send_struct(chan, &data);
+    }
 
-    data.type = FT_A2G_DATA16_MNT_STATUS_EXT;   //report gimbal mode and other status information
-    data.len = 4;
-    data.data[0] = (uint8_t)get_mode();
-    data.data[1] = (uint8_t)_board_version;      // boardinfo status
-    data.data[2] = (uint8_t)_param_read_once;    // parameter status
-    data.data[3] = 0x00;
-
-    mavlink_msg_data16_send_struct(chan, &data);
+    _toggle_status_output ^= _toggle_status_output;
 }
 
 // camera rig parameters

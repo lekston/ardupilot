@@ -37,5 +37,8 @@
 /**
   * @brief Mount status
   * @param 0 status
+  * @param 1 reserved
+  * @param 2 reserved
+  * @param 3 flag: gimbal has Pan               (True/False)
   */
 #define FT_A2G_DATA16_MNT_STATUS_EXT        0x80 //0xDD
