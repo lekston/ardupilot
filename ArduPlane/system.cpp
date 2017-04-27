@@ -581,6 +581,11 @@ void Plane::check_long_failsafe()
             failsafe_long_on_event(FAILSAFE_GCS, MODE_REASON_GCS_FAILSAFE);
         }
     } else {
+        if (failsafe.state == FAILSAFE_GCS) {
+
+            hal.rcin->clear_overrides();
+        }
+
         // We do not change state but allow for user to change mode
         if (failsafe.state == FAILSAFE_GCS && 
             (tnow - failsafe.last_heartbeat_ms) < g.short_fs_timeout*1000) {
@@ -603,6 +608,15 @@ void Plane::check_short_failsafe()
         // The condition is checked and the flag ch3_failsafe is set in radio.cpp
         if(failsafe.ch3_failsafe) {
             failsafe_short_on_event(FAILSAFE_SHORT, MODE_REASON_RADIO_FAILSAFE);
+        }
+
+        if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HEARTBEAT &&
+                failsafe.last_heartbeat_ms != 0)
+        {
+            uint32_t tnow = millis();
+            if ((tnow - failsafe.last_heartbeat_ms) > g.short_fs_timeout*1000) {
+                hal.rcin->clear_overrides();
+            }
         }
     }
 
