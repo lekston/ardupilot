@@ -477,6 +477,9 @@ private:
         // are we headed to the land approach waypoint? Works for any nav type
         bool wp_is_land_approach:1;
 
+        // Transition flag - becomes true only when wp_is_land_approach changes to true
+        bool entering_base_leg:1;
+
         // should we fly inverted?
         bool inverted_flight:1;
 
@@ -901,6 +904,7 @@ private:
     void update_home();
     void do_RTL(int32_t alt);
     bool verify_takeoff();
+    void use_base_turn_shortcut();
     bool verify_loiter_unlim();
     bool verify_loiter_time();
     bool verify_loiter_turns();

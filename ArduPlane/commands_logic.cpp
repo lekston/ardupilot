@@ -43,6 +43,7 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         AP_Mission::Mission_Command next_nav_cmd;
         const uint16_t next_index = mission.get_current_nav_index() + 1;
         auto_state.wp_is_land_approach = mission.get_next_nav_cmd(next_index, next_nav_cmd) && (next_nav_cmd.id == MAV_CMD_NAV_LAND);
+        auto_state.entering_base_leg = auto_state.wp_is_land_approach; 
 
         gcs_send_text_fmt(MAV_SEVERITY_INFO, "Executing nav command ID #%i",cmd.id);
     } else {
@@ -559,6 +560,33 @@ bool Plane::verify_takeoff()
     }
 }
 
+void Plane::use_base_turn_shortcut()
+{
+    //Get the lat/lon of next Nav waypoint after this one:
+    AP_Mission::Mission_Command nav_cmd = mission.get_current_nav_cmd();
+
+    // Bearing in degrees
+    int32_t bearing_cd = get_bearing_cd(current_loc, nav_cmd.content.location);
+    // Get current course.
+    int32_t course_cd = gps.ground_course_cd();
+    // Compute relative course error
+    int32_t course_err_cd = wrap_180_cd(bearing_cd - course_cd);
+
+    /*
+      Check to see if the the plane is heading toward the a waypoint.
+      We use 20 degs (+/-10) of margin so that 200 degs/sec of yaw may be handled.
+      If the turn rate is greater, the WPT corresponding to the final turn
+      will be reached by following the original flight plan leg
+    */
+    if (labs(course_err_cd) <= 1000) {
+        // Want to head in a straight line from _here_ to the next waypoint
+        gcs_send_text(MAV_SEVERITY_INFO, "Base Turn Shortcut applied");
+
+        auto_state.entering_base_leg = false;
+        prev_WP_loc = current_loc;
+    }
+}
+
 /*
   update navigation for normal mission waypoints. Return true when the
   waypoint is complete
@@ -581,6 +609,11 @@ bool Plane::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
             prev_WP_loc = current_loc;
         }
         return false;
+    }
+
+    // verify tracking to final turn while on approach
+    if (auto_state.entering_base_leg) {
+        use_base_turn_shortcut();
     }
 
     float acceptance_distance = nav_controller->turn_distance(g.waypoint_radius, auto_state.next_turn_angle);
