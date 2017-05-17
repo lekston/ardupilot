@@ -34,7 +34,7 @@ void Plane::loiter_angle_update(void)
 {
     int32_t target_bearing_cd = nav_controller->target_bearing_cd();
     int32_t loiter_delta_cd;
-    if (loiter.sum_cd == 0 && !reached_loiter_target()) {
+    if (loiter.sum_cd == 0 && !reached_loiter_target() && !nav_controller->lost_loiter_target()) {
         // we don't start summing until we are doing the real loiter
         loiter_delta_cd = 0;
     } else if (loiter.sum_cd == 0) {
