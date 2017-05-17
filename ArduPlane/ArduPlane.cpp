@@ -1077,10 +1077,12 @@ void Plane::update_alt()
             distance_beyond_land_wp = get_distance(current_loc, next_WP_loc);
         }
 
+        bool is_doing_autoland = auto_state.land_in_progress || auto_state.wp_is_land_approach;
+
         SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
                                                  target_airspeed_cm,
                                                  flight_stage,
-                                                 auto_state.land_in_progress,
+                                                 is_doing_autoland,
                                                  distance_beyond_land_wp,
                                                  get_takeoff_pitch_min_cd(),
                                                  throttle_nudge,
