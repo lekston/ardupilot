@@ -593,6 +593,7 @@ void Plane::handle_rtl_go_around()
         //Initiate rapid level climbout
         gcs_send_text_fmt(MAV_SEVERITY_INFO, "Below %dm; commencing Rapid Climbout.\n",RAPID_CLIMBOUT_IN_ALT);
         auto_state.takeoff_complete = false;
+        // the above causes dependence on very strict conditions in suppress_throttle
         auto_state.takeoff_altitude_rel_cm = RAPID_CLIMBOUT_OUT_ALT * 100;
         auto_state.takeoff_pitch_cd = (auto_state.takeoff_pitch_cd > 0) ? \
                                             auto_state.takeoff_pitch_cd : 500;
@@ -1069,7 +1070,7 @@ void Plane::update_alt()
 
     update_flight_stage();
 
-    if (auto_throttle_mode && !throttle_suppressed) {        
+    if (auto_throttle_mode && !throttle_suppressed) {
 
         float distance_beyond_land_wp = 0;
         if (auto_state.land_in_progress && location_passed_point(current_loc, prev_WP_loc, next_WP_loc)) {

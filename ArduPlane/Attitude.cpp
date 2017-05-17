@@ -666,19 +666,17 @@ bool Plane::suppress_throttle(void)
     }
 
     bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5);
-    
+    bool arspd_high = (ahrs.airspeed_sensor_enabled() && airspeed.get_airspeed() >= 8);
+
     if (control_mode==AUTO && 
         auto_state.takeoff_complete == false) {
 
         uint32_t launch_duration_ms = ((int32_t)g.takeoff_throttle_delay)*100 + 2000;
         if (is_flying() &&
             millis() - started_flying_ms > MAX(launch_duration_ms, 5000U) && // been flying >5s in any mode
-            adjusted_relative_altitude_cm() > 500 && // are >5m above AGL/home
             labs(ahrs.pitch_sensor) < 3000 && // not high pitch, which happens when held before launch
-            gps_movement) { // definite gps movement
-            // we're already flying, do not suppress the throttle. We can get
-            // stuck in this condition if we reset a mission and cmd 1 is takeoff
-            // but we're currently flying around below the takeoff altitude
+            (arspd_high || gps_movement)) { // definite movement
+            // we're already flying, do not suppress the throttle.
             throttle_suppressed = false;
             return false;
         }
@@ -688,10 +686,11 @@ bool Plane::suppress_throttle(void)
             auto_state.baro_takeoff_alt = barometer.get_altitude();
             return false;
         }
+
         // keep throttle suppressed
         return true;
     }
-    
+
     if (relative_altitude_abs_cm() >= 1000) {
         // we're more than 10m from the home altitude
         throttle_suppressed = false;
@@ -707,6 +706,15 @@ bool Plane::suppress_throttle(void)
             throttle_suppressed = false;
             return false;        
         }
+    }
+
+    // Cover the condition when flying into the wind and below the 10m threshold (e.g. over a valley)
+    if (is_flying() && arspd_high) {
+        // TODO consider adding dependence on wind?
+        // unsuppress throttle when flying low into the wind
+        // so that mode changes are safe
+        throttle_suppressed = false;
+        return false;
     }
 
     if (quadplane.is_flying()) {
