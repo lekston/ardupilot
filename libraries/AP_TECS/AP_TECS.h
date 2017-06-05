@@ -35,7 +35,34 @@ public:
     {
         AP_Param::setup_object_defaults(this, var_info);
         _deceleration_counter = 0;
+#ifdef TECS_SIM_BUILD
+        INITIALIZE_PARAMS;
+#endif //TECS_SIM_BUILD
+
     }
+
+#ifdef TECS_SIM_BUILD
+    struct PACKED log_TECS_Tuning {
+        LOG_PACKET_HEADER;
+        uint64_t time_us;
+        float hgt;
+        float dhgt;
+        float hgt_dem;
+        float dhgt_dem;
+        float spd_dem;
+        float spd;
+        float dspd;
+        float ithr;
+        float iptch;
+        float thr;
+        float ptch;
+        float dspd_dem;
+        float speed_weight;
+        uint8_t flags;
+    } log_tuning;
+    // log data on internal state of the controller. Called at 10Hz
+    void log_data(DataFlash_Class &dataflash, uint8_t msgid);
+#endif //TECS_SIM_BUILD
 
     // Update of the estimated height and height rate internal state
     // Update of the inertial speed rate internal state
