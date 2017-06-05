@@ -408,7 +408,7 @@ void AP_TECS::_update_speed(float load_factor)
     bool use_airspeed = _use_synthetic_airspeed_once || _use_synthetic_airspeed.get() || _ahrs.airspeed_sensor_enabled();
     if (!use_airspeed || !_ahrs.airspeed_estimate(&_EAS)) {
         // If no airspeed available use average of min and max
-        _EAS = 0.5f * (aparm.airspeed_min.get() + (float)aparm.airspeed_max.get());
+        _EAS = 0.5f * (aparm.airspeed_min + (float)aparm.airspeed_max);
     }
 
     // Implement a second order complementary filter to obtain a
@@ -1333,6 +1333,24 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Calculate pitch demand
     _update_pitch();
 
+#ifdef TECS_SIM_BUILD
+    // Write internal variables to the log_tuning structure. This
+    // structure will be logged in dataflash at 10Hz
+    log_tuning.hgt_dem  = _hgt_dem_adj;
+    log_tuning.hgt      = _height;
+    log_tuning.dhgt_dem = _hgt_rate_dem;
+    log_tuning.dhgt     = _climb_rate;
+    log_tuning.spd_dem  = _TAS_dem_adj;
+    log_tuning.spd      = _TAS_state;
+    log_tuning.dspd     = _vel_dot;
+    log_tuning.ithr     = _integTHR_state;
+    log_tuning.iptch    = _integSEB_state;
+    log_tuning.thr      = _throttle_dem;
+    log_tuning.ptch     = _pitch_dem;
+    log_tuning.dspd_dem = _TAS_rate_dem;
+    log_tuning.flags    = _flags_byte;
+    log_tuning.time_us  = AP_HAL::micros64();
+#else
     // log to DataFlash
     DataFlash_Class::instance()->Log_Write(
         "TECS",
@@ -1361,7 +1379,19 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
                                            (double)logging.SPE_error,
                                            (double)logging.SEB_delta,
                                            (double)load_factor);
+#endif //TECS_SIM_BUILD
 }
+
+#ifdef TECS_SIM_BUILD
+// log the contents of the log_tuning structure to dataflash
+void AP_TECS::log_data(DataFlash_Class &dataflash, uint8_t msgid)
+{
+    log_tuning.head1 = HEAD_BYTE1;
+    log_tuning.head2 = HEAD_BYTE2;
+    log_tuning.msgid = msgid;
+    dataflash.WriteBlock(&log_tuning, sizeof(log_tuning));
+}
+#endif //TECS_SIM_BUILD
 
 void AP_TECS::force_current_alt(float hgt_afe)
 {
