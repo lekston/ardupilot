@@ -867,7 +867,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
 
     _throttle_raw_dem = _throttle_dem; //FLIGHT TEST USE ONLY
 
-    if ((bool)(_opt_bitmask & USE_OPT_BITMASK_THROTTLE_CURVE))
+    if ((_throttle_dem > 0) && (bool)(_opt_bitmask & USE_OPT_BITMASK_THROTTLE_CURVE))
     {
         // correct for the non-linear throttle response
         if (_thr_exp < 1.01) _thr_exp = 1.0f;
