@@ -87,6 +87,7 @@ void SRV_Channel::aux_servo_function_setup(void)
     switch (function) {
     case k_flap:
     case k_flap_auto:
+    case k_rev_thrust:
     case k_egg_drop:
         set_range(100);
         break;

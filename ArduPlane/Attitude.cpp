@@ -450,6 +450,17 @@ void Plane::calc_throttle()
         commanded_throttle = plane.guided_state.forced_throttle;
     }
 
+    // Must work around the effects of normal reverse configuration
+    // since aparm.throttle_min.get() will remain non-negative
+    if (SRV_Channels::function_assigned(SRV_Channel::k_rev_thrust)) {
+        if (commanded_throttle < 0.0f) {
+            commanded_throttle = abs(commanded_throttle);
+            SRV_Channels::set_output_scaled(SRV_Channel::k_rev_thrust, THR_REV_TRUE);      //100%
+        } else {
+            SRV_Channels::set_output_scaled(SRV_Channel::k_rev_thrust, THR_REV_FALSE);      //0%
+        }
+    }
+
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, commanded_throttle);
 }
 

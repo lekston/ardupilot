@@ -459,5 +459,10 @@ private:
 #define USE_OPT_BITMASK_THR_FBWB_MAN_LIN        (1<<9)  // Disabled by default; 0x200
 #define USE_OPT_BITMASK_THR_FBWB_DEVIATION      (1<<10) // Disabled by default; 0x400
 
+#define USE_OPT_BITMASK_THR_FBWB_TEST_REVERSE   (1<<15) // Disabled by default; 0x8000
+
+#define THR_REV_TRUE        100
+#define THR_REV_FALSE       0
+
 // use _opt_bitmask 0x07C0 for FBWB TECS testing
 

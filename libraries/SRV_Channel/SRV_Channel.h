@@ -46,7 +46,7 @@ public:
         k_flap                  = 2,            ///< flap
         k_flap_auto             = 3,            ///< flap automated
         k_aileron               = 4,            ///< aileron
-        k_unused1               = 5,            ///< unused function
+        k_rev_thrust            = 5,            ///< command throttle reverse function
         k_mount_pan             = 6,            ///< mount yaw (pan)
         k_mount_tilt            = 7,            ///< mount pitch (tilt)
         k_mount_roll            = 8,            ///< mount roll
