@@ -107,6 +107,7 @@ void RC_Channel_aux::aux_servo_function_setup(void)
     switch (function) {
     case RC_Channel_aux::k_flap:
     case RC_Channel_aux::k_flap_auto:
+    case RC_Channel_aux::k_rev_thrust:
     case RC_Channel_aux::k_egg_drop:
         set_range_out(0,100);
         break;
