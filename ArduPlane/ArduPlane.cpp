@@ -812,8 +812,33 @@ void Plane::update_flight_mode(void)
                 ::printf("Test\n");
             }
 
-            throttle_dem = pow( 0.01f * throttle_dem, 1.0f/2.0f );
-            throttle_dem = constrain_float( 100.0f * throttle_dem, 0.0f, 100.0f);
+            bool do_linearize = true;
+            // TEST Reverse Thrust on double channel Interface
+            if ( RC_Channel_aux::function_assigned(RC_Channel_aux::k_rev_thrust) )
+                // && (bool)(SpdHgt_Controller->get_opt_bitmask() & USE_OPT_BITMASK_THR_FBWB_TEST_REVERSE) )
+            {
+                throttle_man_dem = channel_throttle->norm_input() * 100.0f; // -100%, 100%
+                throttle_dem = throttle_man_dem;
+
+                if (throttle_dem < 0.0f)
+                {
+                    throttle_dem = abs(throttle_dem);
+                    RC_Channel_aux::set_servo_out_for(RC_Channel_aux::k_rev_thrust, THR_REV_TRUE);      //100%
+                    do_linearize = false;
+                }
+                else
+                {
+                    RC_Channel_aux::set_servo_out_for(RC_Channel_aux::k_rev_thrust, THR_REV_FALSE);     //0%
+                }
+            }
+
+            if (do_linearize)
+            {
+                // Do linearization ONLY on forward thrust
+                throttle_dem = pow( 0.01f * throttle_dem, 1.0f/2.0f );
+                throttle_dem = constrain_float( 100.0f * throttle_dem, 0.0f, 100.0f);
+            }
+
             channel_throttle->set_servo_out(throttle_dem);
 
           }
