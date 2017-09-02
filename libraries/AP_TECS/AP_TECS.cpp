@@ -711,36 +711,82 @@ float AP_TECS::timeConstant(void) const
 void AP_TECS::_update_throttle_with_airspeed(void)
 {
     // Calculate limits to be applied to potential energy error to prevent over or underspeed occurring due to large height errors
+
     float SPE_err_max = 0.5f * _TASmax * _TASmax - _SKE_dem;
     float SPE_err_min = 0.5f * _TASmin * _TASmin - _SKE_dem;
 
+    // Adjust _STEdot_min = f(AllowedSinkRate) when using Reverse Thrust
+
     // Calculate total energy error
     _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
-    float STEdot_dem = constrain_float((_SPEdot_dem + _SKEdot_dem), _STEdot_min, _STEdot_max);
-    float STEdot_error = STEdot_dem - _SPEdot - _SKEdot;
+
+    // Total energy rate error - Forward thrust case
+    float STEdot_min_fwd = _STEdot_min;
+    float THRmin_fwd = MAX(_THRminf, 0.0f);
+
+    float STEdot_dem_fwd = constrain_float((_SPEdot_dem + _SKEdot_dem), STEdot_min_fwd, _STEdot_max);
+    float STEdot_error_fwd = STEdot_dem_fwd - _SPEdot - _SKEdot;
+
+    // Total energy rate error - Reverse thrust case
+    float STEdot_max_rev = STEdot_min_fwd;
+    float STEdot_min_rev = - _maxSinkRate_approach * GRAVITY_MSS;
+
+    float THRmax_rev = THRmin_fwd;
+    float THRmin_rev = _THRminf;
+
+    float STEdot_dem_rev = constrain_float((_SPEdot_dem + _SKEdot_dem), STEdot_min_rev, STEdot_max_rev);
+    float STEdot_error_rev = STEdot_dem_rev - _SPEdot - _SKEdot;
+
+    // Calculate throttle demand
+
+    // Calculate gain scaler from specific energy error to throttle
+    float K_STE2Thr = 1 / (timeConstant() * (_STEdot_max - _STEdot_min));
+
+    // Calculate feed-forward throttle
+    float ff_throttle = 0;
+    float fwd_ff_throttle = 0;
+    float rev_ff_throttle = 0;
+
+    float nomThr = aparm.throttle_cruise * 0.01f;
+    const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
+    // Use the demanded rate of change of total energy as the feed-forward demand, but add
+    // additional component which scales with (1/cos(bank angle) - 1) to compensate for induced
+    // drag increase during turns.
+    float cosPhi_sq = (rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y);
+    float STE_rollCompensation = _rollComp * (1.0f/constrain_float(cosPhi_sq , 0.1f, 1.0f) - 1.0f);
+
+
+    STEdot_dem_fwd += STE_rollCompensation;
+    fwd_ff_throttle = nomThr + (_THRmaxf - THRmin_fwd) * \
+                                STEdot_dem_fwd / (_STEdot_max - STEdot_min_fwd);
+
+    // Forward thrust case
+    float STEdot_error = STEdot_error_fwd;
+    ff_throttle = fwd_ff_throttle;
+
+    // Reverse thrust case
+    bool need_rev_thrust = (fwd_ff_throttle <= 0.01) && \
+                           (_maxSinkRate_approach > 0 && _flags.is_doing_auto_land);
+    if (need_rev_thrust)
+    // TODO - this condition does not reflect the allow_reverse_thrust() logic of APM
+    {
+        STEdot_dem_rev += STE_rollCompensation;
+        rev_ff_throttle = (THRmax_rev - THRmin_rev) * \
+                          STEdot_dem_rev / (STEdot_max_rev - STEdot_min_rev);
+        // rev_ff_throttle should be a negative number
+
+        STEdot_error = STEdot_error_rev;
+        ff_throttle = rev_ff_throttle;
+    }
+    // XXX we choose between FWD and REV thrust cases very late (some calculations are doubled)
 
     // Apply 0.5 second first order filter to STEdot_error
     // This is required to remove accelerometer noise from the  measurement
     STEdot_error = 0.2f*STEdot_error + 0.8f*_STEdotErrLast;
     _STEdotErrLast = STEdot_error;
 
-    // Calculate throttle demand
 
         // tabulation to keep git readable
-
-        // Calculate gain scaler from specific energy error to throttle
-        float K_STE2Thr = 1 / (timeConstant() * (_STEdot_max - _STEdot_min));
-
-        // Calculate feed-forward throttle
-        float ff_throttle = 0;
-        float nomThr = aparm.throttle_cruise * 0.01f;
-        const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
-        // Use the demanded rate of change of total energy as the feed-forward demand, but add
-        // additional component which scales with (1/cos(bank angle) - 1) to compensate for induced
-        // drag increase during turns.
-        float cosPhi_sq = (rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y);
-        STEdot_dem = STEdot_dem + _rollComp * (1.0f/constrain_float(cosPhi_sq , 0.1f, 1.0f) - 1.0f);
-        ff_throttle = nomThr + STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
 
         // Calculate PD + FF throttle
         float throttle_damp = _thrDamp;
@@ -752,12 +798,10 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         // Constrain throttle demand
         _throttle_dem = constrain_float(_throttle_dem, _THRminf, _THRmaxf);
 
-        float THRminf_clipped_to_zero = constrain_float(_THRminf, 0, _THRmaxf);
-
         // Rate limit PD + FF throttle
         // Calculate the throttle increment from the specified slew time
         if (aparm.throttle_slewrate != 0) {
-            float thrRateIncr = _DT * (_THRmaxf - THRminf_clipped_to_zero) * aparm.throttle_slewrate * 0.01f;
+            float thrRateIncr = _DT * (_THRmaxf - THRmin_fwd) * aparm.throttle_slewrate * 0.01f;
 
             _throttle_dem = constrain_float(_throttle_dem,
                                             _last_throttle_dem - thrRateIncr,
@@ -789,7 +833,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         // Calculate integrator state upper and lower limits
         // Set to a value that will allow 0.1 (10%) throttle saturation to allow for noise on the demand
         // Additionally constrain the integrator state amplitude so that the integrator comes off limits faster.
-        float maxAmp = 0.5f*(_THRmaxf - THRminf_clipped_to_zero);
+        float maxAmp = 0.5f*(_THRmaxf - THRmin_fwd);
         float integ_max = constrain_float((_THRmaxf - _throttle_dem + 0.1f),-maxAmp,maxAmp);
         float integ_min = constrain_float((_THRminf - _throttle_dem),-maxAmp,maxAmp);
 
@@ -809,7 +853,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         // If underspeed condition is triggered rapidly increase throttle
         if (_flags.underspeed && _flags.us_triggered)
         {
-            float _integTHR_shortage = (integ_max - 0.1f) - _integTHR_state;
+            float _integTHR_shortage = MAX((integ_max - 0.1f) - _integTHR_state,0.0f);
 
             if (_integTHR_shortage > 0.0f) {
                 if (_flight_stage == AP_TECS::FLIGHT_LAND_APPROACH \
@@ -870,7 +914,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     }
 
     // Constrain throttle demand
-    _throttle_dem = constrain_float(_throttle_dem, _THRminf, _THRmaxf);
+    _throttle_dem = constrain_float(_throttle_dem, need_rev_thrust ? THRmin_rev : THRmin_fwd, _THRmaxf);
 }
 
 float AP_TECS::_get_i_gain(void)
@@ -923,7 +967,7 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
     // drag increase during turns.
     float cosPhi_sq = (rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y);
     float STEdot_dem = _rollComp * (1.0f/constrain_float(cosPhi_sq , 0.1f, 1.0f) - 1.0f);
-    _throttle_dem = _throttle_dem + STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
+    _throttle_dem = _throttle_dem + STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - MAX(_THRminf,0.0f));
 }
 
 void AP_TECS::_detect_bad_descent(void)
@@ -1044,6 +1088,11 @@ void AP_TECS::_update_pitch(void)
     {
         SEB_PDFF_temp += _PITCHminf * gainInv; // SEB PID: pitch offset for Take-Off/Go-Around
     }
+    else
+    {
+        // XXX Offset for rev thrust? Consider:
+        // SEB_PDFF_temp += _PITCHminf_rev(value<0) * gainInv;
+    }
 
     // Adjust pitch demand integrator on underspeed_trigger
     // that is: Pitch down!
@@ -1082,6 +1131,8 @@ void AP_TECS::_update_pitch(void)
 
     // integrate
     _integSEB_state = constrain_float(_integSEB_state + integSEB_delta, integSEB_min, integSEB_max);
+
+    // TODO Consider rev_thrust depended feed-forward component in pitch demand
 
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (SEB_PDFF_temp + _integSEB_state) / gainInv; // SEB Integration Component
