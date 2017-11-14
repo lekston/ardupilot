@@ -1055,15 +1055,17 @@ void AP_TECS::_update_pitch(void)
             // compute the value of integration component that yields
             // pitch_dem equal to _PITCHminf * 0.5f
             float _integSEB_reset = _PITCHminf * 0.5f * gainInv - SEB_PDFF_temp;
-            _integSEB_state = _integSEB_reset;
+            // make sure u/spd reset does not increase the integrator
+            _integSEB_state = MIN(_integSEB_reset, _integSEB_state);
         }
         else
         {
             // ON TAKE-OFF
             // compute the value of integration component that yields
             // pitch_dem equal to land_pitch
-            float _integSEB_reset = radians(aparm.land_pitch_cd) * gainInv - SEB_PDFF_temp; //XXX
-            _integSEB_state = _integSEB_reset;
+            float _integSEB_reset = radians(aparm.land_pitch_cd) * gainInv - SEB_PDFF_temp;
+            // make sure u/spd reset does not increase the integrator
+            _integSEB_state = MIN(_integSEB_reset, _integSEB_state);
         }
     }
 
