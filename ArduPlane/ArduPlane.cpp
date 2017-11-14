@@ -566,6 +566,9 @@ void Plane::handle_auto_mode(void)
             // decrease airspeed halfway down between V_at and V_min
             // maintain glide slope
             // disable MIN_GNDSPEED
+            // zero throttle
+            channel_throttle->set_servo_out(0);
+
         }
     } else {
         // we are doing normal AUTO flight, the special cases
