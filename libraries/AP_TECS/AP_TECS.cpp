@@ -1114,7 +1114,8 @@ void AP_TECS::_update_pitch(void)
         // SEB_PDFF_temp += _PITCHminf_rev(value<0) * gainInv;
     }
 
-    // XXX Offset for rev thrust? Consider SEB_PDFF_temp += _PITCHminf_rev(value<0) * gainInv
+    // Apply constraints on PDFF part of the Specific Energy Balance control
+    float SEB_PDFF_limited = constrain_float(SEB_PDFF_temp, gainInv * _PITCHminf, gainInv * _PITCHmaxf);
 
     // Adjust pitch demand integrator on underspeed_trigger
     // that is: Pitch down!
@@ -1125,7 +1126,7 @@ void AP_TECS::_update_pitch(void)
         {
             // compute the value of integration component that yields
             // pitch_dem equal to _PITCHminf * 0.5f
-            float _integSEB_reset = _PITCHminf * 0.5f * gainInv - SEB_PDFF_temp;
+            float _integSEB_reset = _PITCHminf * 0.5f * gainInv - SEB_PDFF_limited;
             // make sure u/spd reset does not increase the integrator
             _integSEB_state = MIN(_integSEB_reset, _integSEB_state);
         }
@@ -1134,14 +1135,14 @@ void AP_TECS::_update_pitch(void)
             // ON TAKE-OFF
             // compute the value of integration component that yields
             // pitch_dem equal to land_pitch
-            float _integSEB_reset = radians(aparm.land_pitch_cd) * gainInv - SEB_PDFF_temp;
+            float _integSEB_reset = radians(aparm.land_pitch_cd) * gainInv - SEB_PDFF_limited;
             // make sure u/spd reset does not increase the integrator
             _integSEB_state = MIN(_integSEB_reset, _integSEB_state);
         }
     }
 
-    float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - SEB_PDFF_temp;
-    float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - SEB_PDFF_temp;
+    float integSEB_min = (gainInv * (_PITCHminf - 0.0783f)) - SEB_PDFF_limited;
+    float integSEB_max = (gainInv * (_PITCHmaxf + 0.0783f)) - SEB_PDFF_limited;
     float integSEB_range = integSEB_max - integSEB_min;
 
     logging.SEB_delta = integSEB_delta;
@@ -1159,7 +1160,7 @@ void AP_TECS::_update_pitch(void)
     //        (adapt integrator value)
 
     // Calculate pitch demand from specific energy balance signals
-    _pitch_dem_unc = (SEB_PDFF_temp + _integSEB_state) / gainInv; // SEB Integration Component
+    _pitch_dem_unc = (SEB_PDFF_limited + _integSEB_state) / gainInv; // SEB Integration Component
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
