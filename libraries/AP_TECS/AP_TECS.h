@@ -266,7 +266,6 @@ private:
 
     // Current and last true airspeed demand
     float _TAS_dem;
-    float _TAS_dem_last;
 
     // Equivalent airspeed demand
     float _EAS_dem;

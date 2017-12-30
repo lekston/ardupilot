@@ -485,12 +485,11 @@ void AP_TECS::_update_speed_demand(void)
     }
     else
     {
+        _TAS_rate_dem = (_TAS_dem - _TAS_dem_adj) / 0.1f;
         _TAS_dem_adj = _TAS_dem;
-        _TAS_rate_dem = (_TAS_dem - _TAS_dem_last) / 0.1f;
     }
     // Constrain speed demand again to protect against bad values on initialisation.
     _TAS_dem_adj = constrain_float(_TAS_dem_adj, _TASmin, _TASmax);
-    _TAS_dem_last = _TAS_dem;
 }
 
 void AP_TECS::_update_height_demand(void)
@@ -1198,7 +1197,6 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
         _hgt_dem_in_old    = _hgt_dem_adj_last;
-        _TAS_dem_last      = _TAS_dem;
         _TAS_dem_adj       = _TAS_dem;
         _flags.underspeed        = false;
         _flags.badDescent        = false;
@@ -1212,7 +1210,6 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _hgt_dem_adj_last  = hgt_afe;
         _hgt_dem_adj       = _hgt_dem_adj_last;
         _hgt_dem_prev      = _hgt_dem_adj_last;
-        _TAS_dem_last      = _TAS_dem;
         _TAS_dem_adj       = _TAS_dem;
         _flags.underspeed        = false;
         _flags.badDescent  = false;
