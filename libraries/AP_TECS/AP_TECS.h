@@ -309,6 +309,8 @@ private:
 
         // Underspeed event transition
         bool us_triggered:1;
+
+        bool using_integ_constr:1;
     };
     union {
         struct flags _flags;

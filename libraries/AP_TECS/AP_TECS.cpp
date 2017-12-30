@@ -1053,14 +1053,22 @@ void AP_TECS::_update_pitch(void)
     logging.SPE_error = _SPE_dem - _SPE_est;
 
     // Calculate integrator state, constraining input if pitch limits are exceeded
+    // XXX this part is weird:
+    // - why do we use values of pitch (in radians) to constrain integrator input (in units of specific energy)
+    // - yet I believe this code is almost never used (perhaps only when changing the limits)
+    // - simplest correction would be to multiply radians by gainInv
     float integSEB_input = SEB_error * _get_i_gain();
+
+    _flags.using_integ_constr = false; // TODO check when is it ever used
     if (_pitch_dem > _PITCHmaxf)
     {
         integSEB_input = MIN(integSEB_input, _PITCHmaxf - _pitch_dem);
+        _flags.using_integ_constr = true;
     }
     else if (_pitch_dem < _PITCHminf)
     {
         integSEB_input = MAX(integSEB_input, _PITCHminf - _pitch_dem);
+        _flags.using_integ_constr = true;
     }
 
     float integSEB_delta = integSEB_input * _DT;
