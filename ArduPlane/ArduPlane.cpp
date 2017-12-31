@@ -675,6 +675,46 @@ void Plane::update_flight_mode(void)
                 }
             }
         }
+
+        // do throttle linearization
+        {
+            // removed:         channel_throttle->input(); // write pwm to radio_in (was used i.a. by percent_input())
+            // if needed use:   channel_throttle->set_pwm(channel_throttle->read());
+            float throttle_man_dem = channel_throttle->percent_input(); //0% to 100%
+            float throttle_dem = throttle_man_dem; //0 to 100
+
+            bool do_linearize = true;
+            // TEST Reverse Thrust on double channel Interface
+            if ( SRV_Channels::function_assigned(SRV_Channel::k_rev_thrust) )
+                // && (bool)(SpdHgt_Controller->get_opt_bitmask() & USE_OPT_BITMASK_THR_FBWB_TEST_REVERSE) )
+            {
+                throttle_man_dem = channel_throttle->norm_input() * 100.0f; // -100%, 100%
+                throttle_dem = throttle_man_dem;
+
+                if (throttle_dem < 0.0f)
+                {
+                    throttle_dem = abs(throttle_dem);
+                    SRV_Channels::set_output_scaled(SRV_Channel::k_rev_thrust, THR_REV_TRUE);      //100%
+                    do_linearize = false;
+                }
+                else
+                {
+                    SRV_Channels::set_output_scaled(SRV_Channel::k_rev_thrust, THR_REV_FALSE);      //0%
+                }
+            }
+
+            if (do_linearize)
+            {
+                // Do linearization ONLY on forward thrust
+                throttle_dem = powf( 0.01f * throttle_dem, 1.0f/2.0f );
+                throttle_dem = constrain_float( 100.0f * throttle_dem, 0.0f, 100.0f);
+            }
+
+            throttle_dem = constrain_float( throttle_dem, 0.0f, 100.0f);
+
+            SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, throttle_dem);
+        }
+
         break;
     }
 
