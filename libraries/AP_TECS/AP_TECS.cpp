@@ -713,9 +713,10 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     // Calculate limits to be applied to potential energy error to prevent over or underspeed occurring due to large height errors
 
     float SPE_err_max = 0.5f * _TASmax * _TASmax - _SKE_dem;
-    float SPE_err_min = 0.5f * _TASmin * _TASmin - _SKE_dem;
+    float SPE_err_min = 0.5f * _TASmin * _TASmin - _SKE_dem; // XXX plus minSinkRate (negative)
 
     // Adjust _STEdot_min = f(AllowedSinkRate) when using Reverse Thrust
+    // XXX why do we have the above limits only here and not in the update_pitch function??
 
     // Calculate total energy error
     _STE_error = constrain_float((_SPE_dem - _SPE_est), SPE_err_min, SPE_err_max) + _SKE_dem - _SKE_est;
@@ -731,8 +732,8 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     float STEdot_max_rev = STEdot_min_fwd;
     float STEdot_min_rev = - _maxSinkRate_approach * GRAVITY_MSS;
 
-    float THRmax_rev = THRmin_fwd;
-    float THRmin_rev = _THRminf;
+    float THRmax_rev = THRmin_fwd; // typically equal to 0.0
+    float THRmin_rev = -0.5f * _THRmaxf;// XXX or _THRminf (related to rev thrust interface type (1 or 2ch)
 
     float STEdot_dem_rev = constrain_float((_SPEdot_dem + _SKEdot_dem), STEdot_min_rev, STEdot_max_rev);
     float STEdot_error_rev = STEdot_dem_rev - _SPEdot - _SKEdot;
@@ -796,7 +797,13 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         _throttle_dem = (_STE_error + STEdot_error * throttle_damp) * K_STE2Thr + ff_throttle;
 
         // Constrain throttle demand
-        _throttle_dem = constrain_float(_throttle_dem, _THRminf, _THRmaxf);
+        if (need_rev_thrust) {
+            // apply forward thrust limits
+            _throttle_dem = constrain_float(_throttle_dem, THRmin_rev, THRmax_rev);
+        } else {
+            // apply forward thrust limits
+            _throttle_dem = constrain_float(_throttle_dem, THRmin_fwd, _THRmaxf);
+        }
 
         // Rate limit PD + FF throttle
         // Calculate the throttle increment from the specified slew time
@@ -836,6 +843,12 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         float maxAmp = 0.5f*(_THRmaxf - THRmin_fwd);
         float integ_max = constrain_float((_THRmaxf - _throttle_dem + 0.1f),-maxAmp,maxAmp);
         float integ_min = constrain_float((_THRminf - _throttle_dem),-maxAmp,maxAmp);
+
+        if (need_rev_thrust)
+        {
+            // adjust intergator limits - avoid rapid output changes
+            // TODO
+        }
 
         if (_flight_stage == AP_TECS::FLIGHT_TAKEOFF || _flight_stage == AP_TECS::FLIGHT_LAND_ABORT)
         {
@@ -1094,6 +1107,8 @@ void AP_TECS::_update_pitch(void)
         // SEB_PDFF_temp += _PITCHminf_rev(value<0) * gainInv;
     }
 
+    // XXX Offset for rev thrust? Consider SEB_PDFF_temp += _PITCHminf_rev(value<0) * gainInv
+
     // Adjust pitch demand integrator on underspeed_trigger
     // that is: Pitch down!
     if (_flags.underspeed && _flags.us_triggered)
@@ -1133,6 +1148,8 @@ void AP_TECS::_update_pitch(void)
     _integSEB_state = constrain_float(_integSEB_state + integSEB_delta, integSEB_min, integSEB_max);
 
     // TODO Consider rev_thrust depended feed-forward component in pitch demand
+    // Opt_1: Adjust pitch limits/integrator constrains during the use of rev thrust
+    //        (adapt integrator value)
 
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (SEB_PDFF_temp + _integSEB_state) / gainInv; // SEB Integration Component
