@@ -772,6 +772,45 @@ void Plane::update_flight_mode(void)
                 }
             }
         }
+
+        {
+            // XXX test pitch mixing options
+            channel_throttle->input(); // writes pwm to radio_in (used i.a. by percent_input())
+            float throttle_man_dem = channel_throttle->percent_input(); //0% to 100%
+            float throttle_dem = throttle_man_dem; //0 to 100
+
+            bool do_linearize = true;
+            // TEST Reverse Thrust on double channel Interface
+            if ( RC_Channel_aux::function_assigned(RC_Channel_aux::k_rev_thrust) )
+                // && (bool)(SpdHgt_Controller->get_opt_bitmask() & USE_OPT_BITMASK_THR_FBWB_TEST_REVERSE) )
+            {
+                throttle_man_dem = channel_throttle->norm_input() * 100.0f; // -100%, 100%
+                throttle_dem = throttle_man_dem;
+
+                if (throttle_dem < 0.0f) // XXX ground test config for Rev_Thr iface
+                {
+                    throttle_dem = abs(throttle_dem);
+                    RC_Channel_aux::set_servo_out_for(RC_Channel_aux::k_rev_thrust, THR_REV_TRUE);      //100%
+                    do_linearize = false;
+                }
+                else
+                {
+                    RC_Channel_aux::set_servo_out_for(RC_Channel_aux::k_rev_thrust, THR_REV_FALSE);     //0%
+                }
+            }
+
+            if (do_linearize)
+            {
+                // Do linearization ONLY on forward thrust
+                throttle_dem = pow( 0.01f * throttle_dem, 1.0f/2.0f );
+                throttle_dem = constrain_float( 100.0f * throttle_dem, 0.0f, 100.0f);
+            }
+
+            throttle_dem = constrain_float( throttle_dem, 0.0f, 100.0f);
+
+            channel_throttle->set_servo_out(throttle_dem);
+
+        }
         break;
     }
 
@@ -823,7 +862,7 @@ void Plane::update_flight_mode(void)
                 throttle_man_dem = channel_throttle->norm_input() * 100.0f; // -100%, 100%
                 throttle_dem = throttle_man_dem;
 
-                if (throttle_dem < 0.0f)
+                if (throttle_dem < 0.0f) // XXX ground test config for Rev_Thr iface
                 {
                     throttle_dem = abs(throttle_dem);
                     RC_Channel_aux::set_servo_out_for(RC_Channel_aux::k_rev_thrust, THR_REV_TRUE);      //100%
