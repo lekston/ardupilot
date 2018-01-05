@@ -765,22 +765,41 @@ void AP_TECS::_update_throttle_with_airspeed(void)
 
 
     STEdot_dem_fwd += STE_rollCompensation;
-    fwd_ff_throttle = nomThr + (_THRmaxf - THRmin_fwd) * \
-                                STEdot_dem_fwd / (_STEdot_max - STEdot_min_fwd);
+
+    // Nominal throttle should give level flight at trim speed.
+
+    // Option 1: completely disregards nomThr
+    /* fwd_ff_throttle = (_THRmaxf - THRmin_fwd) * \
+     *                 (STEdot_dem_fwd - STEdot_min_fwd) / (_STEdot_max - STEdot_min_fwd);
+     */
+
+    // Option 2: requires correct nomThr setting,
+    // but otherwise there is no way to adjust nominal throttle to target speed in level flight
+    if (STEdot_dem_fwd >= 0.0)
+    {
+        fwd_ff_throttle = nomThr + (_THRmaxf - nomThr) * STEdot_dem_fwd / _STEdot_max;
+    }
+    else
+    {
+        fwd_ff_throttle = nomThr - (nomThr - THRmin_fwd) * STEdot_dem_fwd / STEdot_min_fwd;
+    }
 
     // Forward thrust case
     float STEdot_error = STEdot_error_fwd;
     ff_throttle = fwd_ff_throttle;
 
     // Reverse thrust case
-    bool need_rev_thrust = (fwd_ff_throttle <= 0.01) && \
-                           (_maxSinkRate_approach > 0 && _flags.is_doing_auto_land);
+    bool rev_thrust_allowed = (_maxSinkRate_approach > 0) && _flags.is_doing_auto_land;
+    bool need_rev_thrust    = !_flags.underspeed && (fwd_ff_throttle <= 0.02) && rev_thrust_allowed;
+
+    _flags.need_rev_thrust = need_rev_thrust;
+
     if (need_rev_thrust)
     // TODO - this condition does not reflect the allow_reverse_thrust() logic of APM
     {
         STEdot_dem_rev += STE_rollCompensation;
-        rev_ff_throttle = (THRmax_rev - THRmin_rev) * \
-                          STEdot_dem_rev / (STEdot_max_rev - STEdot_min_rev);
+        rev_ff_throttle = - (THRmax_rev - THRmin_rev) * \
+                          (STEdot_max_rev - STEdot_dem_rev) / (STEdot_max_rev - STEdot_min_rev);
         // rev_ff_throttle should be a negative number
 
         STEdot_error = STEdot_error_rev;
@@ -851,10 +870,11 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         float integ_max = constrain_float((_THRmaxf - _throttle_dem + 0.1f),-maxAmp,maxAmp);
         float integ_min = constrain_float((_THRminf - _throttle_dem),-maxAmp,maxAmp);
 
-        if (need_rev_thrust)
+        if (_throttle_dem < 0.0)
         {
-            // adjust intergator limits - avoid rapid output changes
-            // TODO
+            integ_max = constrain_float((THRmax_rev - _throttle_dem + 0.1f),-maxAmp,maxAmp);
+            integ_min = constrain_float((THRmin_rev - _throttle_dem),-maxAmp,maxAmp);
+            // XXX consequences? We should adjust intergator limits to AVOID rapid output changes
         }
 
         if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF ||
