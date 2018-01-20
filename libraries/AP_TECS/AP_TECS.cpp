@@ -578,6 +578,7 @@ void AP_TECS::_update_height_demand(void)
 void AP_TECS::_detect_underspeed(void)
 {
     bool slowing_down = false;
+    _flags.us_triggered = false;
 
     float STEdot = _SPEdot + _SKEdot;
     float throttle_damp = (_flags.is_doing_auto_land && !is_zero(_land_throttle_damp)) ?
@@ -661,7 +662,6 @@ void AP_TECS::_detect_underspeed(void)
     } else if (!_flags.underspeed && _flags.us_triggered) {
         hal.console->printf("U/S prot Deactiv at %.02f m/s\n", _TAS_state);
     }
-    _flags.us_triggered = false;
 #endif
 }
 
