@@ -532,6 +532,8 @@ void Plane::handle_rtl_go_around()
 
         takeoff_calc_roll();
         takeoff_calc_pitch();
+
+        SRV_Channels::set_output_scaled(SRV_Channel::k_rev_thrust, THR_REV_FALSE);
         if(aparm.takeoff_throttle_max != 0) {
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, aparm.takeoff_throttle_max);
         } else {
