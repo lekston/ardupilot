@@ -152,6 +152,7 @@ public:
         _use_synthetic_airspeed_once = true;
     }
 
+    // force all internal altitude state variables to current altitude
     void force_current_alt(float hgt_afe);
 
     bool get_underspeed(void) const {
@@ -166,6 +167,9 @@ public:
         return int32_t(_opt_bitmask);
     }
 
+    // support following a predefined glide slope / flight path angle
+    void set_glide_slope_helper(float slope_dem, float gnd_spd = 0.0f);
+
     // this supports the TECS_* user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -178,6 +182,9 @@ private:
 
     // Last time update_pitch_throttle was called
     uint64_t _update_pitch_throttle_last_usec;
+
+    // Last gamma demand update
+    uint64_t _update_slope_dem_usec;
 
     // reference to the AHRS object
     AP_AHRS &_ahrs;
@@ -294,6 +301,11 @@ private:
     float _hgt_dem_prev;
     float _land_hgt_dem;
 
+    // glide slope / flight path angle demand
+    float _slope_dem;
+    float _lead_hgt_dem;
+    float _gnd_spd_last;
+
     // Speed demand after application of rate limiting
     // This is the demand tracked by the TECS control loops
     float _TAS_dem_adj;
@@ -378,7 +390,7 @@ private:
     uint8_t _flare_counter;
 
     // slew height demand lag filter value when transition to land
-    float hgt_dem_lag_filter_slew;
+    float _hgt_dem_lead_filter_slew;
 
     // percent traveled along the previous and next waypoints
     float _path_proportion;

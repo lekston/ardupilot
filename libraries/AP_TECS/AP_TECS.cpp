@@ -555,14 +555,28 @@ void AP_TECS::_update_height_demand(void)
     // be replaced with a better zero-lag filter in the future.
     float new_hgt_dem = _hgt_dem_adj;
     if (_flags.is_doing_auto_land) {
-        if (hgt_dem_lag_filter_slew < 1) {
-            hgt_dem_lag_filter_slew += 0.04f; // increment at 10Hz to gradually apply the compensation at first
+        uint64_t now = AP_HAL::micros64();
+        float time_since_gamma_update = (now - _update_slope_dem_usec) * 1.0e-6f;
+        if (time_since_gamma_update <= 1.0f) {
+            // must get gnd_spd update at least once a sec to keep it valid
+            // Fade-in
+            if (_hgt_dem_lead_filter_slew < 1) {
+                _hgt_dem_lead_filter_slew += 0.04f;
+            } else {
+                _hgt_dem_lead_filter_slew = 1;
+            }
         } else {
-            hgt_dem_lag_filter_slew = 1;
+            // no update -> prediction invalid
+            // Fade-out
+            if (_hgt_dem_lead_filter_slew > 0) {
+                _hgt_dem_lead_filter_slew -= 0.04f;
+            } else {
+                _hgt_dem_lead_filter_slew = 0;
+            }
         }
-        new_hgt_dem += hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last)*10.0f*(timeConstant()+1);
+        new_hgt_dem += _hgt_dem_lead_filter_slew * _lead_hgt_dem;
     } else {
-        hgt_dem_lag_filter_slew = 0;
+        _hgt_dem_lead_filter_slew = 0;
     }
     _hgt_dem_adj_last = _hgt_dem_adj;
     _hgt_dem_adj = new_hgt_dem;
@@ -739,7 +753,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     float STEdot_min_rev = - _maxSinkRate_approach * GRAVITY_MSS;
 
     float THRmax_rev = THRmin_fwd; // typically equal to 0.0
-    float THRmin_rev = -0.5f * _THRmaxf;// XXX or _THRminf (related to rev thrust interface type (1 or 2ch)
+    float THRmin_rev = -0.5f;// -0.5*_THRmaxf or _THRminf (related to rev thrust interface type (1 or 2ch)
 
     float STEdot_dem_rev = constrain_float((_SPEdot_dem + _SKEdot_dem), STEdot_min_rev, STEdot_max_rev);
     float STEdot_error_rev = STEdot_dem_rev - _SPEdot - _SKEdot;
@@ -1488,4 +1502,35 @@ void AP_TECS::force_current_alt(float hgt_afe)
     _hgt_rate_dem       = 0;
 
     //XXX could also limit speed in here (or increase minimum pitch)
+}
+
+void AP_TECS::set_glide_slope_helper(float slope_dem, float gnd_spd)
+{
+    // save the last update to allow smooth fade-in/-out between direct & gamma-driven hgt_dem
+    uint64_t now = AP_HAL::micros64();
+    float DT = (now - _update_slope_dem_usec) * 1.0e-6f;
+    _update_slope_dem_usec = now;
+
+    if (gnd_spd < 0.01f) {
+        // ground speed not available, use air speed
+
+        // When ground speed is unknown (not given) assuming a medium airspeed as target
+        // will reduce RoD/RoC demand when slower, and increase RoD/RoC demand when faster.
+        // Ideally, this would correspond to following a fixed flight path angle (no wind).
+        gnd_spd = 0.5f * (aparm.airspeed_min + (float)aparm.airspeed_max);
+        // OR
+        // gnd_spd = _TAS_dem; // given by the USER of SpdHgt_Controller
+    } else if (gnd_spd < 3.0f) {
+        // use a reasonable minimum ground speed
+        gnd_spd = 3.0f;
+    }
+
+    if (DT > 1.0f) {
+        _gnd_spd_last = gnd_spd;
+    }
+    gnd_spd = _gnd_spd_last * 0.8f + gnd_spd * 0.2f;
+
+    _slope_dem = slope_dem; // as gradient in % (negative for landing)
+
+    _lead_hgt_dem = _slope_dem * gnd_spd * (timeConstant() + 1);
 }

@@ -104,6 +104,8 @@ public:
     // landing altitude offset (meters)
     float alt_offset;
 
+    float get_slope() { return slope; }
+
 private:
     struct {
         // denotes if a go-around has been commanded for landing

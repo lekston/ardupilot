@@ -38,6 +38,8 @@ public:
 
 	virtual bool get_underspeed(void) const = 0;
 
+	virtual void set_glide_slope_helper(float slope_dem, float gnd_spd) = 0;
+
 	// demanded throttle in percentage
 	// should return 0 to 100
 	virtual int32_t get_throttle_demand(void)=0;
