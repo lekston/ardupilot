@@ -493,6 +493,38 @@ void AP_TECS::_update_speed_demand(void)
 
 void AP_TECS::_update_height_demand(void)
 {
+    // For landing approach we will predict ahead by the distance to be
+    // covered within a single time constant. This avoids a
+    // lagged height demand while constantly descending which causes
+    // us to consistently be above the desired glide slope.
+    float hgt_dem_no_lag = _hgt_dem;
+    if (_flags.is_doing_auto_land) {
+        uint64_t now = AP_HAL::micros64();
+        float time_since_gamma_update = (now - _update_slope_dem_usec) * 1.0e-6f;
+        if (time_since_gamma_update <= 1.0f) {
+            // must get gnd_spd update at least once a sec to keep it valid
+            // Fade-in
+            if (_hgt_dem_lead_filter_slew < 1) {
+                _hgt_dem_lead_filter_slew += 0.04f;
+            } else {
+                _hgt_dem_lead_filter_slew = 1;
+            }
+        } else {
+            // no update -> prediction invalid
+            // Fade-out
+            if (_hgt_dem_lead_filter_slew > 0) {
+                _hgt_dem_lead_filter_slew -= 0.04f;
+            } else {
+                _hgt_dem_lead_filter_slew = 0;
+            }
+        }
+        hgt_dem_no_lag += _hgt_dem_lead_filter_slew * _lead_hgt_dem;
+    } else {
+        _hgt_dem_lead_filter_slew = 0;
+    }
+    _hgt_dem = hgt_dem_no_lag;
+
+
     // Apply 2 point moving average to demanded height
     _hgt_dem = 0.5f * (_hgt_dem + _hgt_dem_in_old);
     _hgt_dem_in_old = _hgt_dem;
@@ -548,38 +580,7 @@ void AP_TECS::_update_height_demand(void)
         _flare_counter = 0;
     }
 
-    // for landing approach we will predict ahead by the time constant
-    // plus the lag produced by the first order filter. This avoids a
-    // lagged height demand while constantly descending which causes
-    // us to consistently be above the desired glide slope. This will
-    // be replaced with a better zero-lag filter in the future.
-    float new_hgt_dem = _hgt_dem_adj;
-    if (_flags.is_doing_auto_land) {
-        uint64_t now = AP_HAL::micros64();
-        float time_since_gamma_update = (now - _update_slope_dem_usec) * 1.0e-6f;
-        if (time_since_gamma_update <= 1.0f) {
-            // must get gnd_spd update at least once a sec to keep it valid
-            // Fade-in
-            if (_hgt_dem_lead_filter_slew < 1) {
-                _hgt_dem_lead_filter_slew += 0.04f;
-            } else {
-                _hgt_dem_lead_filter_slew = 1;
-            }
-        } else {
-            // no update -> prediction invalid
-            // Fade-out
-            if (_hgt_dem_lead_filter_slew > 0) {
-                _hgt_dem_lead_filter_slew -= 0.04f;
-            } else {
-                _hgt_dem_lead_filter_slew = 0;
-            }
-        }
-        new_hgt_dem += _hgt_dem_lead_filter_slew * _lead_hgt_dem;
-    } else {
-        _hgt_dem_lead_filter_slew = 0;
-    }
     _hgt_dem_adj_last = _hgt_dem_adj;
-    _hgt_dem_adj = new_hgt_dem;
 }
 
 /* Extended underspeed protection targeting the following use cases:
