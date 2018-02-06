@@ -757,6 +757,9 @@ private:
     // Arming/Disarming mangement class
     AP_Arming_Plane arming;
 
+    // FT disarming
+    enum AP_HAL::Util::safety_state prev_safety_state = AP_HAL::Util::SAFETY_DISARMED;
+
     AP_Param param_loader {var_info};
 
     static const AP_Scheduler::Task scheduler_tasks[];

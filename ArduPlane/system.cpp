@@ -741,6 +741,11 @@ bool Plane::arm_motors(const AP_Arming::ArmingMethod method, const bool do_armin
         return false;
     }
 
+    // FT disarming
+    if (hal.util->safety_switch_state() == AP_HAL::Util::SAFETY_ARMED) {
+        prev_safety_state = AP_HAL::Util::SAFETY_ARMED;
+    }
+
     change_arm_state();
     return true;
 }

@@ -124,6 +124,16 @@ void Plane::loop()
 
 void Plane::update_soft_armed()
 {
+    // FT disarming procedure
+    if (hal.util->safety_switch_state() == AP_HAL::Util::SAFETY_DISARMED &&
+        prev_safety_state == AP_HAL::Util::SAFETY_ARMED &&
+        arming.arming_required())
+    {
+        arming.disarm();
+        prev_safety_state = AP_HAL::Util::SAFETY_DISARMED;
+    }
+    // (Do nothing in case of reading SAFETY_NONE status)
+
     hal.util->set_soft_armed(arming.is_armed() &&
                              hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED);
     DataFlash.set_vehicle_armed(hal.util->get_soft_armed());
