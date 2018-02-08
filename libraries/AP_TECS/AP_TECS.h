@@ -107,6 +107,16 @@ public:
         return _vel_dot;
     }
 
+    // smoothed airspeed estimate
+    float get_smooth_TAS(void) const {
+        return _TAS_state;
+    }
+
+    // smoothed climb/descent rate estimate
+    float get_vert_rate(void) const {
+        return _climb_rate;
+    }
+
     // return current target airspeed
     float get_target_airspeed(void) const {
         return _TAS_dem / _ahrs.get_EAS2TAS();

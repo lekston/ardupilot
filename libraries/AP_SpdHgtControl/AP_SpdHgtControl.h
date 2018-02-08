@@ -54,6 +54,12 @@ public:
 	
 	// Rate of change of velocity along X body axis in m/s^2
     virtual float get_VXdot(void)=0;
+
+    // smoothed airspeed estimate
+	virtual float get_smooth_TAS(void) const = 0;
+
+    // smoothed climb/descent rate estimate
+	virtual float get_vert_rate(void) const = 0;
 	
 	// return current target airspeed
 	virtual float get_target_airspeed(void) const = 0;
