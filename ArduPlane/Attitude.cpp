@@ -411,7 +411,11 @@ void Plane::stabilize()
     /*
       see if we should zero the attitude controller integrators. 
      */
-    if (channel_throttle->get_control_in() == 0 &&
+    bool throttle_off = channel_throttle->get_control_in() == 0 ||
+                       (auto_throttle_mode && throttle_suppressed) ||
+                       (hal.util->safety_switch_state() == AP_HAL::Util::SAFETY_DISARMED);
+
+    if (throttle_off &&
         fabsf(relative_altitude) < 5.0f && 
         fabsf(barometer.get_climb_rate()) < 0.5f &&
         gps.ground_speed() < 3 &&
