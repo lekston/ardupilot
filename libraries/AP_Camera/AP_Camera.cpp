@@ -252,14 +252,29 @@ void AP_Camera::send_feedback(mavlink_channel_t chan)
         altitude_rel = current_loc.alt - ahrs.get_home().alt;
     }
 
-    mavlink_msg_camera_feedback_send(
-        chan,
-        AP::gps().time_epoch_usec(),
-        0, 0, _image_index,
-        current_loc.lat, current_loc.lng,
-        altitude*1e-2f, altitude_rel*1e-2f,
-        ahrs.roll_sensor*1e-2f, ahrs.pitch_sensor*1e-2f, ahrs.yaw_sensor*1e-2f,
-        0.0f, CAMERA_FEEDBACK_PHOTO, _feedback_events);
+    // report if we are using feedback pin
+    if (_closedloop_feed_in_prog[chan] == _image_index) {
+        _closedloop_feed_in_prog[chan] = 0xFFFF;
+
+        mavlink_msg_camera_feedback_send(chan,
+            AP::gps().time_epoch_usec(),
+            0, 0, _image_index,
+            current_loc.lat, current_loc.lng,
+            altitude*1e-2f, altitude_rel*1e-2f,
+            ahrs.roll_sensor*1e-2f, ahrs.pitch_sensor*1e-2f, ahrs.yaw_sensor*1e-2f,
+            0.0f,CAMERA_FEEDBACK_CLOSEDLOOP, _feedback_events);
+    }
+
+    if (_openloop_feed_in_prog[chan] == _image_index) {
+        _openloop_feed_in_prog[chan] = 0xFFFF;
+        mavlink_msg_camera_feedback_send(chan,
+            AP::gps().time_epoch_usec(),
+            0, 0, _image_index,
+            current_loc.lat, current_loc.lng,
+            altitude*1e-2f, altitude_rel*1e-2f,
+            ahrs.roll_sensor*1e-2f, ahrs.pitch_sensor*1e-2f, ahrs.yaw_sensor*1e-2f,
+            0.0f,CAMERA_FEEDBACK_OPENLOOP, _feedback_events);
+    }
 }
 
 
@@ -396,8 +411,11 @@ void AP_Camera::log_picture()
     if (df == nullptr) {
         return;
     }
+    for(int8_t i = 0; i < MAVLINK_COMM_NUM_BUFFERS; i++)
+        _openloop_feed_in_prog[i] = _image_index;
+    gcs().send_message(MSG_CAMERA_FEEDBACK);
+
     if (!using_feedback_pin()) {
-        gcs().send_message(MSG_CAMERA_FEEDBACK);
         if (df->should_log(log_camera_bit)) {
             df->Log_Write_Camera(ahrs, current_loc);
         }
@@ -433,8 +451,11 @@ void AP_Camera::take_picture()
 void AP_Camera::update_trigger()
 {
     trigger_pic_cleanup();
+
     if (check_feedback_pin()) {
         _feedback_events++;
+        for(int8_t i = 0; i < MAVLINK_COMM_NUM_BUFFERS; i++)
+            _closedloop_feed_in_prog[i] = _image_index;
         gcs().send_message(MSG_CAMERA_FEEDBACK);
         DataFlash_Class *df = DataFlash_Class::instance();
         if (df != nullptr) {

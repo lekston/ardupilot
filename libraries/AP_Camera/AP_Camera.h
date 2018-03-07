@@ -38,6 +38,8 @@ public:
     {
         AP_Param::setup_object_defaults(this, var_info);
         _apm_relay = obj_relay;
+        memset(_openloop_feed_in_prog, 0, sizeof(_openloop_feed_in_prog));
+        memset(_closedloop_feed_in_prog, 0, sizeof(_closedloop_feed_in_prog));
     }
 
     /* Do not allow copies */
@@ -125,5 +127,8 @@ private:
 
     // return true if we are using a feedback pin
     bool using_feedback_pin(void) const { return _feedback_pin > 0; }
+
+    uint16_t _openloop_feed_in_prog[MAVLINK_COMM_NUM_BUFFERS];
+    uint16_t _closedloop_feed_in_prog[MAVLINK_COMM_NUM_BUFFERS];
 
 };
