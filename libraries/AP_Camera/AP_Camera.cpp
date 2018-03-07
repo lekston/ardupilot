@@ -105,6 +105,10 @@ const AP_Param::GroupInfo AP_Camera::var_info[] = {
 
 extern const AP_HAL::HAL& hal;
 
+ObjectBuffer<struct AP_Camera::CamFeedbackEntry> AP_Camera::_cam_feedback_queue(AP_CAMERA_FEEDBACK_QUEUE_LEN);
+
+#define CAM_HIGH_PRIORITY_FEEDBACK_CHAN 2
+
 /*
   static trigger var for PX4 callback
  */
@@ -243,40 +247,125 @@ void AP_Camera::control(float session, float zoom_pos, float zoom_step, float fo
  */
 void AP_Camera::send_feedback(mavlink_channel_t chan)
 {
-    float altitude, altitude_rel;
-    if (current_loc.flags.relative_alt) {
-        altitude = current_loc.alt+ahrs.get_home().alt;
-        altitude_rel = current_loc.alt;
+    if (chan == CAM_HIGH_PRIORITY_FEEDBACK_CHAN) {
+
+        if (_cam_feedback_queue.available()) {
+            struct CamFeedbackEntry entry;
+
+            _cam_feedback_queue.peek(entry);
+
+            float altitude, altitude_rel;
+            if (entry.loc.flags.relative_alt) {
+                altitude = 0.01f * (entry.loc.alt + ahrs.get_home().alt);
+                altitude_rel = 0.01f * entry.loc.alt;
+            } else {
+                altitude = 0.01f * entry.loc.alt;
+                altitude_rel = 0.01f * (entry.loc.alt - ahrs.get_home().alt);
+            }
+
+            mavlink_msg_camera_feedback_send(chan,
+                entry.timestamp, 0, 0,
+                entry.image_idx,
+                entry.loc.lat, entry.loc.lng,
+                altitude, altitude_rel,
+                entry.roll_cd*1e-2f, entry.pitch_cd*1e-2f, entry.yaw_cd*1e-2f,
+                0.0f, entry.flags, entry.fb_events);
+
+            bool do_pop = true;
+
+            if (entry.flags == CAMERA_FEEDBACK_CLOSEDLOOP) {
+                uint8_t idx = _image_index % AP_CAMERA_FEEDBACK_QUEUE_LEN;
+                // idx is allways within a sliding window (0,QUEUE_LEN) of last pictures
+                if (_cam_resend[idx] > 0) {
+                    _cam_resend[idx] -= 1;
+                    // still need to resend; do not pop
+                    do_pop = false;
+                }
+            }
+
+            if (do_pop) {
+                _cam_feedback_queue.pop();
+            }
+
+        } else {
+            // caller (gcs) wants to pass high priority feedback but the queue is empty
+            // this should not happen
+            _queue_error_cnt++;
+            gcs().send_text(MAV_SEVERITY_WARNING, "Cam feedback unreliable (%d).", _queue_error_cnt);
+        }
+
     } else {
-        altitude = current_loc.alt;
-        altitude_rel = current_loc.alt - ahrs.get_home().alt;
-    }
+        // handle normal priority feedback
 
-    // report if we are using feedback pin
-    if (_closedloop_feed_in_prog[chan] == _image_index) {
-        _closedloop_feed_in_prog[chan] = 0xFFFF;
+        float altitude, altitude_rel;
+        if (current_loc.flags.relative_alt) {
+            altitude = 0.01f * (current_loc.alt + ahrs.get_home().alt);
+            altitude_rel = 0.01f * current_loc.alt;
+        } else {
+            altitude = 0.01f * current_loc.alt;
+            altitude_rel = 0.01f * (current_loc.alt - ahrs.get_home().alt);
+        }
 
-        mavlink_msg_camera_feedback_send(chan,
-            AP::gps().time_epoch_usec(),
-            0, 0, _image_index,
-            current_loc.lat, current_loc.lng,
-            altitude*1e-2f, altitude_rel*1e-2f,
-            ahrs.roll_sensor*1e-2f, ahrs.pitch_sensor*1e-2f, ahrs.yaw_sensor*1e-2f,
-            0.0f,CAMERA_FEEDBACK_CLOSEDLOOP, _feedback_events);
-    }
+        // tx buffer was confirmed for a SINGLE message so make sure we never send two
+        bool skip_open_loop = false;
 
-    if (_openloop_feed_in_prog[chan] == _image_index) {
-        _openloop_feed_in_prog[chan] = 0xFFFF;
-        mavlink_msg_camera_feedback_send(chan,
-            AP::gps().time_epoch_usec(),
-            0, 0, _image_index,
-            current_loc.lat, current_loc.lng,
-            altitude*1e-2f, altitude_rel*1e-2f,
-            ahrs.roll_sensor*1e-2f, ahrs.pitch_sensor*1e-2f, ahrs.yaw_sensor*1e-2f,
-            0.0f,CAMERA_FEEDBACK_OPENLOOP, _feedback_events);
+        if (_closedloop_feed_in_prog[chan] == _image_index) {
+            _closedloop_feed_in_prog[chan] = 0xFFFF;
+
+            // send closed loop feedback
+            mavlink_msg_camera_feedback_send(chan,
+                AP::gps().time_epoch_usec(),
+                0, 0, _image_index,
+                current_loc.lat, current_loc.lng,
+                altitude*1e-2f, altitude_rel*1e-2f,
+                ahrs.roll_sensor*1e-2f, ahrs.pitch_sensor*1e-2f, ahrs.yaw_sensor*1e-2f,
+                0.0f, CAMERA_FEEDBACK_CLOSEDLOOP, _feedback_events);
+
+            skip_open_loop = true;
+        }
+
+        if (_openloop_feed_in_prog[chan] == _image_index && !skip_open_loop) {
+            _openloop_feed_in_prog[chan] = 0xFFFF;
+
+            // send open loop feedback
+            mavlink_msg_camera_feedback_send(chan,
+                AP::gps().time_epoch_usec(),
+                0, 0, _image_index,
+                current_loc.lat, current_loc.lng,
+                altitude*1e-2f, altitude_rel*1e-2f,
+                ahrs.roll_sensor*1e-2f, ahrs.pitch_sensor*1e-2f, ahrs.yaw_sensor*1e-2f,
+                0.0f, CAMERA_FEEDBACK_OPENLOOP, _feedback_events);
+        }
     }
 }
 
+void AP_Camera::feedback_to_queue(uint8_t fb_type)
+{
+    struct CamFeedbackEntry entry;
+
+    entry.timestamp = AP::gps().time_epoch_usec();
+    entry.image_idx = _image_index;
+    entry.roll_cd   = static_cast<uint16_t>(ahrs.roll_sensor);
+    entry.pitch_cd  = static_cast<uint16_t>(ahrs.pitch_sensor);
+    entry.yaw_cd    = ahrs.yaw_sensor;
+    entry.loc       = current_loc;
+    entry.flags     = fb_type;
+    entry.fb_events = _feedback_events;
+
+    if (fb_type == CAMERA_FEEDBACK_CLOSEDLOOP) {
+        uint8_t idx = _image_index % AP_CAMERA_FEEDBACK_QUEUE_LEN;
+        // idx is allways within a sliding window (0,QUEUE_LEN) of last pictures
+        _cam_resend[idx] = 3;   // will be sent 4 times in total
+    }
+
+    if(_cam_feedback_queue.space()) {
+        _cam_feedback_queue.push(entry);
+    } else {
+        _cam_feedback_queue.push_force(entry);
+        _queue_error_cnt++;
+        gcs().send_text(MAV_SEVERITY_WARNING, "Cam feedback buffer overflow (%d).", _queue_error_cnt);
+    }
+}
 
 /*  update; triggers by distance moved
 */
@@ -413,6 +502,8 @@ void AP_Camera::log_picture()
     }
     for(int8_t i = 0; i < MAVLINK_COMM_NUM_BUFFERS; i++)
         _openloop_feed_in_prog[i] = _image_index;
+
+    feedback_to_queue(CAMERA_FEEDBACK_OPENLOOP);
     gcs().send_message(MSG_CAMERA_FEEDBACK);
 
     if (!using_feedback_pin()) {
@@ -456,12 +547,23 @@ void AP_Camera::update_trigger()
         _feedback_events++;
         for(int8_t i = 0; i < MAVLINK_COMM_NUM_BUFFERS; i++)
             _closedloop_feed_in_prog[i] = _image_index;
+
+        // XXX this timestamp is still up to 20ms off
+        feedback_to_queue(CAMERA_FEEDBACK_CLOSEDLOOP);
         gcs().send_message(MSG_CAMERA_FEEDBACK);
+
         DataFlash_Class *df = DataFlash_Class::instance();
         if (df != nullptr) {
             if (df->should_log(log_camera_bit)) {
                 df->Log_Write_Camera(ahrs, current_loc);
             }
+        }
+    } else if (_cam_feedback_queue.available()) {
+        _cam_feed_div++;
+        if (_cam_feed_div % 5 == 0) {
+            gcs().send_message(MSG_CAMERA_FEEDBACK);
+            // XXX this triggers communication on ALL channels
+            // DO THIS ONLY on CAM_HIGH_PRIORITY_FEEDBACK_CHAN
         }
     }
 }

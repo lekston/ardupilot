@@ -14,6 +14,8 @@
 #include <drivers/drv_hrt.h>
 #endif
 
+#include <AP_HAL/utility/RingBuffer.h>
+
 #define AP_CAMERA_TRIGGER_TYPE_SERVO                0
 #define AP_CAMERA_TRIGGER_TYPE_RELAY                1
 
@@ -26,6 +28,8 @@
 
 #define AP_CAMERA_FEEDBACK_DEFAULT_FEEDBACK_PIN -1  // default is to not use camera feedback pin
 
+#define AP_CAMERA_FEEDBACK_QUEUE_LEN        8   // must be 2^n (to keep resend buf in synch)
+
 /// @class	Camera
 /// @brief	Object managing a Photo or video camera
 class AP_Camera {
@@ -34,12 +38,15 @@ public:
     AP_Camera(AP_Relay *obj_relay, uint32_t _log_camera_bit, const struct Location &_loc, const AP_AHRS &_ahrs)
         : log_camera_bit(_log_camera_bit)
         , current_loc(_loc)
-        , ahrs(_ahrs)
+        , ahrs(_ahrs),
+        _cam_feed_div(0),
+        _queue_error_cnt(0)
     {
         AP_Param::setup_object_defaults(this, var_info);
         _apm_relay = obj_relay;
         memset(_openloop_feed_in_prog, 0, sizeof(_openloop_feed_in_prog));
         memset(_closedloop_feed_in_prog, 0, sizeof(_closedloop_feed_in_prog));
+        memset(_cam_resend, 0, sizeof(_cam_resend));
     }
 
     /* Do not allow copies */
@@ -71,6 +78,18 @@ public:
 
     // set if vehicle is in AUTO mode
     void set_is_auto_mode(bool enable) { _is_in_auto_mode = enable; }
+
+    struct CamFeedbackEntry {
+
+        uint64_t timestamp;     // [usec] gps time epoch
+        uint16_t image_idx;     // 0xFFFF is undefined (default)
+        int16_t  roll_cd;       // roll [-180,180] in centi-degrees
+        int16_t  pitch_cd;      // pitch [-90,90] in centi-degrees
+        int32_t  yaw_cd;        // yaw     [0,360] in centi-degrees
+        struct Location loc;    //
+        uint8_t  flags;         // see enum CAMERA_FEEDBACK_FLAGS (from mavlink lib)
+        uint16_t fb_events;     // number of feedback events since boot
+    };
 
 private:
     AP_Int8         _trigger_type;      // 0:Servo,1:Relay
@@ -128,7 +147,14 @@ private:
     // return true if we are using a feedback pin
     bool using_feedback_pin(void) const { return _feedback_pin > 0; }
 
+    void feedback_to_queue(uint8_t fb_type);
+
     uint16_t _openloop_feed_in_prog[MAVLINK_COMM_NUM_BUFFERS];
     uint16_t _closedloop_feed_in_prog[MAVLINK_COMM_NUM_BUFFERS];
 
+    static ObjectBuffer<struct CamFeedbackEntry> _cam_feedback_queue;
+    uint8_t _cam_resend[AP_CAMERA_FEEDBACK_QUEUE_LEN];
+
+    uint8_t _cam_feed_div;
+    uint16_t _queue_error_cnt;
 };
