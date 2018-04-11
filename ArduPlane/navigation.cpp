@@ -188,6 +188,10 @@ void Plane::calc_gndspeed_undershoot()
         float gndspd_along_track = navVect * gndSpdVect;
         float gndSpdFwd = MAX(gndspd_forward, gndspd_along_track);
 
+        if (landing.is_on_approach()) {
+            SpdHgt_Controller->set_glide_slope_helper(-landing.get_slope(), gndSpdFwd);
+        }
+
         float gndspd_undershoot_error = aparm.min_gndspeed_cm - gndSpdFwd*100;
         // compensate for the lag in airspeed controller (coverting to cm/sec)
         gndspd_undershoot_error -= airspeed_error*100;
