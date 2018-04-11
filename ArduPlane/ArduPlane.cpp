@@ -866,6 +866,10 @@ void Plane::update_flight_mode(void)
     case INITIALISING:
         // handled elsewhere
         break;
+
+    default:
+        set_mode(CRUISE, MODE_REASON_UNKNOWN);
+        break;
     }
 }
 
@@ -962,6 +966,7 @@ void Plane::update_navigation()
     case QLOITER:
     case QLAND:
     case QRTL:
+    default:
         // nothing to do
         break;
     }

@@ -206,6 +206,7 @@ void Plane::update_sensor_status_flags(void)
         break;
 
     case INITIALISING:
+    default:
         break;
     }
 

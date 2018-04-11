@@ -374,6 +374,11 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         acro_state.locked_roll = false;
         acro_state.locked_pitch = false;
         break;
+
+    case CRUISE_LAND:
+        gcs().send_text(MAV_SEVERITY_INFO, "CRUISE LAND started");
+        control_mode = CRUISE;
+        // fall through to CRUISE
         
     case CRUISE:
         throttle_allows_nudging = false;
@@ -406,6 +411,22 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         auto_navigation_mode = true;
         next_WP_loc.alt = current_loc.alt;
         break;
+
+    case AUTO_LAND: {
+        // attempt to switch to next DO_LAND_START command in the mission
+        bool found_land_sequence_start = plane.mission.jump_to_landing_sequence();
+
+        if (!found_land_sequence_start) {
+            // DO_LAND_START wpt not found, use an approximate land seq entry
+            int16_t land_start_seq = plane.mission.num_commands() - 5;
+            land_start_seq = MAX(land_start_seq, 0);
+            plane.mission.set_current_cmd(land_start_seq);
+
+            gcs().send_text(MAV_SEVERITY_INFO, "Approximate landing sequence start");
+        }
+        control_mode = AUTO;
+        // no break, fall through to AUTO
+    }
 
     case AUTO:
         throttle_allows_nudging = true;

@@ -51,6 +51,8 @@ MAV_MODE GCS_MAVLINK_Plane::base_mode() const
         break;
     case INITIALISING:
         break;
+    default:
+        break;
     }
 
     if (!plane.training_manual_pitch || !plane.training_manual_roll) {
@@ -1631,9 +1633,11 @@ bool GCS_MAVLINK_Plane::set_mode(const uint8_t mode)
     case AUTOTUNE:
     case FLY_BY_WIRE_B:
     case CRUISE:
+    case CRUISE_LAND:
     case AVOID_ADSB:
     case GUIDED:
     case AUTO:
+    case AUTO_LAND:
     case RTL:
     case LOITER:
     case QSTABILIZE:
