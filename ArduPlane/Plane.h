@@ -413,11 +413,27 @@ private:
         int32_t locked_pitch_cd;
     } acro_state;
 
+    enum CruiseFlareEnum {
+        CFLARE_OFF      = 0,    /* Normal CRUISE */
+        CFLARE_ARMED    = 1,    /* CRUISE LAND on approach */
+        CFLARE_START    = 2,
+        CFLARE_RUN      = 3,
+        CFLARE_REARM    = 4
+    };
+
     // CRUISE controller state
     struct CruiseState {
         bool locked_heading;
         int32_t locked_heading_cd;
+        int32_t locked_course_cd;
+        uint64_t last_10Hz_update_us;
         uint32_t lock_timer_ms;
+        int32_t ref_top_of_descent_alt_cm;  // altitude at which CRUISE_LAND was engaged
+        int32_t ref_alt_integ_cm;           // altitude integrator used during descent following glideslope
+        int16_t ref_gamma_dem_pc;           // [percent] reference glideslope angle: negative -> descent
+        int32_t ref_nav_pitch_cd;           // calue of nav_pitch_cd before the flare
+        uint32_t flare_timer_ms;
+        enum CruiseFlareEnum fs;
     } cruise_state;
 
     struct {
@@ -904,7 +920,6 @@ private:
     void calc_airspeed_errors();
     void calc_gndspeed_undershoot();
     void update_loiter(uint16_t radius);
-    void update_cruise();
     void update_fbwb_speed_height(void);
     void setup_turn_angle(void);
     bool reached_loiter_target(void);
@@ -983,6 +998,7 @@ private:
     bool in_preLaunch_flight_stage(void);
     void handle_auto_mode(void);
     void handle_rtl_go_around(void);
+    void handle_cruise_mode();
     void calc_throttle();
     void calc_nav_roll();
     void calc_nav_pitch();

@@ -111,11 +111,22 @@ void Plane::calc_airspeed_errors()
     if (control_mode == FLY_BY_WIRE_B) {
         // leave at cruise target when in TECS test config
     } else if (control_mode == CRUISE) {
-        target_airspeed_cm = ((int32_t)(aparm.airspeed_max -
-                                        aparm.airspeed_min) *
-                              channel_throttle->get_control_in()) +
-                             ((int32_t)aparm.airspeed_min * 100 + 200);
-
+        if (cruise_state.fs == CFLARE_OFF) {
+            // normal CRUISE guidance for speed control
+            target_airspeed_cm = ((int32_t)(aparm.airspeed_max -
+                                           (aparm.airspeed_min + 2)) *
+                                  channel_throttle->get_control_in()) +
+                                 (int32_t)(aparm.airspeed_min + 2) * 100;
+        } else {
+            // CRUISE LAND submode uses lower speeds
+            int16_t throttle_in = channel_throttle->get_control_in();
+            // lower portion of the throttle input is used for initiating the flare
+            throttle_in = MAX(throttle_in, 40);
+            int32_t speed_change = (int32_t)
+                                  (aparm.airspeed_cruise_cm * 0.01 - aparm.airspeed_min);
+            target_airspeed_cm = speed_change * throttle_in +
+                                 ((int32_t)aparm.airspeed_min * 100);
+        }
     } else if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
         // Landing airspeed target
         target_airspeed_cm = landing.get_target_airspeed_cm();
@@ -189,6 +200,7 @@ void Plane::calc_gndspeed_undershoot()
         float gndSpdFwd = MAX(gndspd_forward, gndspd_along_track);
 
         if (landing.is_on_approach()) {
+            // in case of GPS loss this lead hgt demand correction will fade-out by itself
             SpdHgt_Controller->set_glide_slope_helper(-landing.get_slope(), gndSpdFwd);
         }
 
@@ -264,41 +276,6 @@ void Plane::update_loiter(uint16_t radius)
 }
 
 /*
-  handle CRUISE mode, locking heading to GPS course when we have
-  sufficient ground speed, and no aileron or rudder input
- */
-void Plane::update_cruise()
-{
-    if (!cruise_state.locked_heading &&
-        channel_roll->get_control_in() == 0 &&
-        rudder_input == 0 &&
-        gps.status() >= AP_GPS::GPS_OK_FIX_2D &&
-        gps.ground_speed() >= 3 &&
-        cruise_state.lock_timer_ms == 0) {
-        // user wants to lock the heading - start the timer
-        cruise_state.lock_timer_ms = millis();
-    }
-    if (cruise_state.lock_timer_ms != 0 &&
-        (millis() - cruise_state.lock_timer_ms) > 500) {
-        // lock the heading after 0.5 seconds of zero heading input
-        // from user
-        cruise_state.locked_heading = true;
-        cruise_state.lock_timer_ms = 0;
-        cruise_state.locked_heading_cd = gps.ground_course_cd();
-        prev_WP_loc = current_loc;
-    }
-    if (cruise_state.locked_heading) {
-        next_WP_loc = prev_WP_loc;
-        // always look 1km ahead
-        location_update(next_WP_loc,
-                        cruise_state.locked_heading_cd*0.01f, 
-                        get_distance(prev_WP_loc, current_loc) + 1000);
-        nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
-    }
-}
-
-
-/*
   handle speed and height control in FBWB or CRUISE mode. 
   In this mode the elevator is used to change target altitude. The
   throttle is used to change target airspeed or throttle
@@ -313,22 +290,75 @@ void Plane::update_fbwb_speed_height(void)
         dt = constrain_float(dt, 0.1, 0.15);
 
         target_altitude.last_elev_check_us = now;
-        
+
+        // Process input
         float elevator_input = channel_pitch->get_control_in() / 4500.0f;
     
-        if (g.flybywire_elev_reverse) {
-            elevator_input = -elevator_input;
+        if (g.flybywire_elev_reverse) { elevator_input = -elevator_input; }
+
+        if (cruise_state.ref_gamma_dem_pc != 0) {
+            // CRUISE_LAND: vertical guidance based on gamma_dem
+            // gamma_dem is allways less or equal zero
+            float gamma_dem = cruise_state.ref_gamma_dem_pc;
+
+            // Actual component of gnd_speed along the nose is already supervised
+            // by the min_gndspeed code working to maintain consistent airspeed_target
+            // Hence, as long as we have a valid GPS reading, we are covered here
+            float gnd_spd = gps.status() >= AP_GPS::GPS_OK_FIX_2D ?
+                            gps.ground_speed() : SpdHgt_Controller->get_smooth_TAS();
+
+            // scale input to achieve higher descent rates with reverse thrust
+            if (elevator_input < 0.0f) elevator_input *= 2.0f;
+
+            // normal positive elevator (nose UP) should direct gamma_dem toward level flight
+            gamma_dem += elevator_input * -cruise_state.ref_gamma_dem_pc;
+
+            // desired gamma (always less or equal zero in CRUISE_LAND)
+            gamma_dem = constrain_float(gamma_dem, 3 * cruise_state.ref_gamma_dem_pc, 0);
+
+            // integrate desired altitude change for glide slope handling
+            cruise_state.ref_alt_integ_cm += gamma_dem * gnd_spd * dt;
+
+            // update target_altitude
+            target_altitude.amsl_cm =
+                    cruise_state.ref_top_of_descent_alt_cm + cruise_state.ref_alt_integ_cm;
+
+        } else {
+            // reset CRUISE_LAND state
+            cruise_state.ref_alt_integ_cm = 0.0f;
+
+            // classic CRUISE & FBWB control
+            int32_t alt_change_cm = g.flybywire_climb_rate * elevator_input * dt * 100;
+            change_target_altitude(alt_change_cm);
         }
 
-        int32_t alt_change_cm = g.flybywire_climb_rate * elevator_input * dt * 100;
-        change_target_altitude(alt_change_cm);
-        
-        if (is_zero(elevator_input) && !is_zero(target_altitude.last_elevator_input)) {
-            // the user has just released the elevator, lock in
-            // the current altitude
+        bool recalc_cruise_state = false;
+
+        if ( elevator_input * target_altitude.last_elevator_input < 0.0f ) {
+            // the user has just changed the input direction
+            // reset the current altitude
             set_target_altitude_current();
+
+            recalc_cruise_state = true;
         }
-        
+
+        if (is_zero(elevator_input) && !is_zero(target_altitude.last_elevator_input)) {
+            // the user has just released the elevator, lock in the current altitude
+            set_target_altitude_current();
+
+            // lead target altitude by 1 sec of vertical rate for smooth level off
+            target_altitude.amsl_cm += SpdHgt_Controller->get_vert_rate()*100;
+
+            recalc_cruise_state = true;
+        }
+
+        if ((recalc_cruise_state) && (cruise_state.ref_gamma_dem_pc != 0))
+        {
+            // adjust cruise_state altitude demand to current state
+            cruise_state.ref_top_of_descent_alt_cm =
+                    target_altitude.amsl_cm - cruise_state.ref_alt_integ_cm;
+        }
+
         target_altitude.last_elevator_input = elevator_input;
     }
     

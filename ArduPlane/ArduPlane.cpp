@@ -557,6 +557,214 @@ void Plane::handle_rtl_go_around()
 }
 
 /*
+  CRUISE mode uses the navigation code to control roll when heading is locked.
+  Heading becomes unlocked on any aileron or rudder input.
+*/
+void Plane::handle_cruise_mode(void)
+{
+    // normally called between 50-400Hz
+    uint64_t now = micros();
+    uint32_t now_ms = millis();
+
+    bool have_lateral_input = ( channel_roll->get_control_in() != 0 ||
+                                channel_rudder->get_control_in() != 0 );
+
+    bool gps_gndspd_OK = ( gps.status() >= AP_GPS::GPS_OK_FIX_2D &&
+                           gps.ground_speed() >= 8 );
+
+    // run 10Hz divider
+    bool run_10Hz = false;
+    if (now - cruise_state.last_10Hz_update_us > 100000) {
+        run_10Hz = true;
+        cruise_state.last_10Hz_update_us = now;
+    }
+
+    if (have_lateral_input) {
+        // user controls the heading
+        cruise_state.locked_heading = false;
+        cruise_state.lock_timer_ms = 0;
+    } else {
+        // start transfering roll control to nav code
+        if (!cruise_state.locked_heading &&
+            cruise_state.lock_timer_ms == 0) {
+            // user wants to lock the heading - start the timer
+            cruise_state.lock_timer_ms = now_ms;
+        }
+
+        // do transfer roll control to nav code
+        if (cruise_state.lock_timer_ms != 0 &&
+            (now_ms - cruise_state.lock_timer_ms) > 1500) {
+            // lock the heading after 1 second of zero user roll input
+            cruise_state.locked_heading = true;
+            cruise_state.lock_timer_ms = 0;
+
+            // allways lock heading
+            cruise_state.locked_heading_cd = wrap_360_cd(ahrs.yaw_sensor);
+            cruise_state.locked_course_cd = -1;
+
+            if (gps_gndspd_OK) {
+                cruise_state.locked_course_cd = wrap_360_cd(gps.ground_course_cd());
+                prev_WP_loc = current_loc;
+            }
+        }
+    }
+
+    // 10Hz
+    if (cruise_state.locked_heading && run_10Hz) {
+
+        if (gps_gndspd_OK && cruise_state.locked_course_cd != -1) {
+
+            next_WP_loc = prev_WP_loc;
+            // always look 1km ahead
+            location_update(next_WP_loc,
+                            cruise_state.locked_course_cd*0.01f,
+                            get_distance(prev_WP_loc, current_loc) + 1000);
+            nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
+
+        } else {
+
+            // call navigation controller for heading hold
+            nav_controller->update_heading_hold(cruise_state.locked_heading_cd);
+
+        }
+    }
+
+    // 100Hz
+    if (cruise_state.locked_heading) {
+        calc_nav_roll();
+    } else {
+        nav_roll_cd = channel_roll->norm_input() * roll_limit_cd;
+        nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
+        update_load_factor();
+    }
+
+    // In CRUISE LAND, flare is started when USER moves the throttle into the lower 20%
+    int16_t throttle_in = channel_throttle->get_control_in();
+    bool throttle_closed = (throttle_in < 20) && (throttle_in >= 0);
+
+    const int16_t cflare_pitch_max_cd = 250;
+    const int16_t cflare_pitch_trim_cd  = 0; //landing.get_pitch_cd();
+    const int16_t cflare_pitch_min_cd =-400;
+
+    const int16_t fade_time_max = 2000;
+
+    switch (cruise_state.fs) {
+        case CFLARE_OFF: {
+            cruise_state.flare_timer_ms = 0;
+            cruise_state.ref_nav_pitch_cd = 0;
+
+            // handle normal TECS based control of pitch & throttle
+            update_fbwb_speed_height();     // (internally limited to 10Hz)
+
+        } break;
+        case CFLARE_ARMED: {
+            if (throttle_closed) {
+                if (cruise_state.flare_timer_ms == 0) {
+                    // just detected USER input
+                    cruise_state.flare_timer_ms = now_ms;
+                }
+
+                if (now_ms - cruise_state.flare_timer_ms > 250) {
+                    // delay 250ms to avoid spurrious state changes
+                    cruise_state.fs = CFLARE_START;
+
+                    // save last nav_pitch_cd
+                    cruise_state.ref_nav_pitch_cd = nav_pitch_cd;
+
+                    gcs().send_text(MAV_SEVERITY_INFO, "CFLARE tr STARTED %d", (int)now_ms);
+                }
+            } else {
+                // reset timer, user input too short
+                cruise_state.flare_timer_ms = 0;
+                cruise_state.ref_nav_pitch_cd = 0;
+            }
+
+            // Handle TECS based control of pitch & throttle
+            // Here TECS is using stage == AP_Vehicle::FixedWing::FLIGHT_LAND
+            update_fbwb_speed_height();     // (internally limited to 10Hz)
+
+        } break;
+        case CFLARE_START: {
+            if (!throttle_closed) {
+                cruise_state.fs = CFLARE_REARM;
+                gcs().send_text(MAV_SEVERITY_INFO, "CFLARE tr ABORTED");
+            }
+            // Fade-in pitch limits
+            int16_t fade_in_progress_ms = (int16_t)(now_ms - (cruise_state.flare_timer_ms + 250));
+            fade_in_progress_ms = MIN(fade_in_progress_ms, fade_time_max);
+            float p = (1.0f*fade_in_progress_ms)/fade_time_max;
+
+            int32_t loc_pitch_max_cd  = p*cflare_pitch_max_cd  + (1-p)*aparm.pitch_limit_max_cd.get();
+            int32_t loc_pitch_min_cd  = p*cflare_pitch_min_cd  + (1-p)*pitch_limit_min_cd;
+            int32_t loc_pitch_trim_cd = p*cflare_pitch_trim_cd + (1-p)*cruise_state.ref_nav_pitch_cd;
+
+            // Use FBWA control style for pitch control
+            // set nav_pitch using sticks, but use mode and more strict pitch limits
+            float pitch_input = channel_pitch->norm_input();
+            if (pitch_input > 0) {
+                nav_pitch_cd = loc_pitch_trim_cd + pitch_input * (loc_pitch_max_cd - loc_pitch_trim_cd);
+            } else {
+                nav_pitch_cd = loc_pitch_trim_cd - pitch_input * (loc_pitch_min_cd - loc_pitch_trim_cd);
+            }
+
+            nav_pitch_cd = constrain_int32(nav_pitch_cd, loc_pitch_min_cd, loc_pitch_max_cd);
+
+            // Throttle control
+            if ( SRV_Channels::function_assigned(SRV_Channel::k_rev_thrust) )
+            {
+                SRV_Channels::set_output_scaled(SRV_Channel::k_rev_thrust, THR_REV_FALSE); //0%
+            }
+
+            SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
+
+            if (fade_in_progress_ms >= fade_time_max) {
+                // fade-in takes 2sec
+                cruise_state.fs = CFLARE_RUN;
+                gcs().send_text(MAV_SEVERITY_INFO, "CFLARE tr COMPLETED %d", (int)now_ms);
+            }
+
+        } break;
+        case CFLARE_RUN: {
+            if (!throttle_closed) {
+                cruise_state.fs = CFLARE_REARM;
+                gcs().send_text(MAV_SEVERITY_INFO, "CFLARE tr RESET");
+            }
+            // Use FBWA control style for pitch control
+            // set nav_pitch using sticks
+            float pitch_input = channel_pitch->norm_input();
+            if (pitch_input > 0) {
+                nav_pitch_cd = cflare_pitch_trim_cd + pitch_input * (cflare_pitch_max_cd - cflare_pitch_trim_cd);
+            } else {
+                nav_pitch_cd = cflare_pitch_trim_cd - pitch_input * (cflare_pitch_min_cd - cflare_pitch_trim_cd);
+            }
+
+            nav_pitch_cd = constrain_int32(nav_pitch_cd, cflare_pitch_min_cd, cflare_pitch_max_cd);
+
+            // Throttle is suppressed
+        } break;
+        case CFLARE_REARM: {
+
+            // Reset CRUISE LAND states
+
+            cruise_state.ref_top_of_descent_alt_cm = adjusted_altitude_cm();
+            cruise_state.ref_alt_integ_cm =   0;
+            cruise_state.ref_gamma_dem_pc = -10; // 10%
+            cruise_state.ref_nav_pitch_cd =   0;
+
+            // reset flare timer
+
+            cruise_state.flare_timer_ms = 0;
+
+            // handle normal TECS based control of pitch & throttle
+            update_fbwb_speed_height();     // (internally limited to 10Hz)
+
+            cruise_state.fs = CFLARE_ARMED;
+
+        } break;
+    }
+}
+
+/*
   main flight mode dependent update code 
  */
 void Plane::update_flight_mode(void)
@@ -791,27 +999,9 @@ void Plane::update_flight_mode(void)
         break;
     }
 
-    case CRUISE: {
-        /*
-          in CRUISE mode we use the navigation code to control
-          roll when heading is locked. Heading becomes unlocked on
-          any aileron or rudder input
-        */
-        if (channel_roll->get_control_in() != 0 || channel_rudder->get_control_in() != 0) {
-            cruise_state.locked_heading = false;
-            cruise_state.lock_timer_ms = 0;
-        }                 
-        
-        if (!cruise_state.locked_heading) {
-            nav_roll_cd = channel_roll->norm_input() * roll_limit_cd;
-            nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
-            update_load_factor();
-        } else {
-            calc_nav_roll();
-        }
-        update_fbwb_speed_height();
+    case CRUISE:
+        handle_cruise_mode();
         break;
-    }
 
     case STABILIZE:
         nav_roll_cd        = 0;
@@ -949,9 +1139,6 @@ void Plane::update_navigation()
         break;
 
     case CRUISE:
-        update_cruise();
-        break;
-
     case MANUAL:
     case STABILIZE:
     case TRAINING:
@@ -1021,9 +1208,13 @@ void Plane::update_alt()
             distance_beyond_land_wp = get_distance(current_loc, next_WP_loc);
         }
 
+        // this is to allow using Reverse Thrust in CRUISE LAND submode
+        AP_Vehicle::FixedWing::FlightStage tecs_stage = flight_stage;
+        if (cruise_state.fs != CFLARE_OFF) tecs_stage = AP_Vehicle::FixedWing::FLIGHT_LAND;
+
         SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
                                                  target_airspeed_cm,
-                                                 flight_stage,
+                                                 tecs_stage,
                                                  distance_beyond_land_wp,
                                                  get_takeoff_pitch_min_cd(),
                                                  throttle_nudge,

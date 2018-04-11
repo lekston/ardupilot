@@ -301,6 +301,11 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
     guided_state.last_forced_rpy_ms.zero();
     guided_state.last_forced_throttle_ms = 0;
 
+    // reset cruise gamma_dem for normal level flight CRUISE
+    cruise_state.ref_gamma_dem_pc = 0.0f;
+    cruise_state.ref_top_of_descent_alt_cm = 0;
+    cruise_state.fs = CFLARE_OFF;
+
     // set mode
     previous_mode = control_mode;
     control_mode = mode;
@@ -376,6 +381,11 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         break;
 
     case CRUISE_LAND:
+        // offset gamma_dem to follow desired glide path
+        cruise_state.ref_top_of_descent_alt_cm = adjusted_altitude_cm();
+        cruise_state.ref_gamma_dem_pc = -10; // 10%
+        cruise_state.flare_timer_ms = 0;
+        cruise_state.fs = CFLARE_ARMED;
         gcs().send_text(MAV_SEVERITY_INFO, "CRUISE LAND started");
         control_mode = CRUISE;
         // fall through to CRUISE
@@ -386,6 +396,8 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         auto_navigation_mode = false;
         cruise_state.locked_heading = false;
         cruise_state.lock_timer_ms = 0;
+        cruise_state.last_10Hz_update_us = 0;
+        cruise_state.ref_alt_integ_cm = 0.0f;
         
         // for ArduSoar soaring_controller
         g2.soaring_controller.init_cruising();

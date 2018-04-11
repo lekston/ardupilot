@@ -72,6 +72,12 @@ bool Plane::suppress_throttle(void)
         return true;
     }
 
+    if (cruise_state.fs == CFLARE_RUN) {
+        // CRUISE LAND requests suppressing throttle
+        throttle_suppressed = true;
+        return true;
+    }
+
     if (!throttle_suppressed) {
         // we've previously met a condition for unsupressing the throttle
         return false;
