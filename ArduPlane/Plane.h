@@ -1002,6 +1002,7 @@ private:
     bool in_preLaunch_flight_stage(void);
     void handle_auto_mode(void);
     void handle_rtl_go_around(void);
+    void handle_rtl_autoland(void);
     void handle_cruise_mode();
     void calc_throttle();
     void calc_nav_roll();

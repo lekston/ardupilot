@@ -1087,6 +1087,85 @@ void Plane::update_flight_mode(void)
     }
 }
 
+void Plane::handle_rtl_autoland()
+{
+    if (auto_state.checked_for_autoland)
+        return;
+
+    switch (g.rtl_autoland) {
+    case 1:
+        if (reached_loiter_target() &&
+            labs(altitude_error_cm) < 1000)
+        {
+            // we've reached the RTL point, see if we have a landing sequence
+            if (mission.jump_to_landing_sequence()) {
+                // switch from RTL -> AUTO
+                set_mode(AUTO, MODE_REASON_UNKNOWN);
+            }
+
+            // jump_to_landing_sequence is expensive -> run only once
+            auto_state.checked_for_autoland = true;
+        }
+        break;
+    case 2:
+        // Go directly to the landing sequence
+        if (mission.jump_to_landing_sequence()) {
+            // switch from RTL -> AUTO
+            set_mode(AUTO, MODE_REASON_UNKNOWN);
+        }
+
+        // jump_to_landing_sequence is expensive -> run only once
+        auto_state.checked_for_autoland = true;
+        break;
+    case 3: /* FT */
+        if (reached_loiter_target() &&
+            labs(altitude_error_cm) < 1000)
+        {
+            if (loiter.start_time_ms == 0) {
+                loiter.start_time_ms = AP_HAL::millis();
+                break;
+            }
+
+            bool do_jump_to_landing = false;
+            if ( previous_mode_reason == MODE_REASON_RADIO_FAILSAFE ||
+                 previous_mode_reason == MODE_REASON_BATTERY_FAILSAFE ||
+                 previous_mode_reason == MODE_REASON_GCS_FAILSAFE ) {
+                     hal.console->printf("%d\n", previous_mode_reason);
+                if (AP_HAL::millis() - loiter.start_time_ms > 60*1000) {
+                    // wait 60 secs after established in loiter if RTL was due to Failsafe
+                    do_jump_to_landing = true;
+                }
+            } else {
+                if (AP_HAL::millis() - loiter.start_time_ms > 300*1000) {
+                    // wait 300 secs after established in loiter (general case)
+                    do_jump_to_landing = true;
+                }
+            }
+
+            if (do_jump_to_landing) {
+                // attempt to switch to next DO_LAND_START command in the mission
+                bool found_land_sequence_start = plane.mission.jump_to_landing_sequence();
+
+                if (!found_land_sequence_start) {
+                    // DO_LAND_START wpt not found, use an approximate land seq entry
+                    int16_t land_start_seq = plane.mission.num_commands() - 5;
+                    land_start_seq = MAX(land_start_seq, 0);
+                    plane.mission.set_current_cmd(land_start_seq);
+
+                    gcs().send_text(MAV_SEVERITY_INFO, "Approximate landing sequence start");
+                }
+                // switch from RTL -> AUTO
+                set_mode(AUTO, MODE_REASON_UNKNOWN);
+                // jump_to_landing_sequence is expensive -> run only once
+                auto_state.checked_for_autoland = true;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 void Plane::update_navigation()
 {
     // wp_distance is in ACTUAL meters, not the *100 meters we get from the GPS
@@ -1118,32 +1197,10 @@ void Plane::update_navigation()
              */
             set_mode(QRTL, MODE_REASON_UNKNOWN);
             break;
-        } else if (g.rtl_autoland == 1 &&
-            !auto_state.checked_for_autoland &&
-            reached_loiter_target() && 
-            labs(altitude_error_cm) < 1000) {
-            // we've reached the RTL point, see if we have a landing sequence
-            if (mission.jump_to_landing_sequence()) {
-                // switch from RTL -> AUTO
-                set_mode(AUTO, MODE_REASON_UNKNOWN);
-            }
-
-            // prevent running the expensive jump_to_landing_sequence
-            // on every loop
-            auto_state.checked_for_autoland = true;
+        } else if (g.rtl_autoland !=0) {
+            handle_rtl_autoland();
         }
-        else if (g.rtl_autoland == 2 &&
-            !auto_state.checked_for_autoland) {
-            // Go directly to the landing sequence
-            if (mission.jump_to_landing_sequence()) {
-                // switch from RTL -> AUTO
-                set_mode(AUTO, MODE_REASON_UNKNOWN);
-            }
 
-            // prevent running the expensive jump_to_landing_sequence
-            // on every loop
-            auto_state.checked_for_autoland = true;
-        }
         radius = abs(g.rtl_radius);
         if (radius > 0) {
             loiter.direction = (g.rtl_radius < 0) ? -1 : 1;
