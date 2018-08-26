@@ -1131,12 +1131,12 @@ void Plane::handle_rtl_autoland()
                  previous_mode_reason == MODE_REASON_BATTERY_FAILSAFE ||
                  previous_mode_reason == MODE_REASON_GCS_FAILSAFE ) {
                      hal.console->printf("%d\n", previous_mode_reason);
-                if (AP_HAL::millis() - loiter.start_time_ms > 60*1000) {
+                if (AP_HAL::millis() > loiter.start_time_ms + 60*1000) {
                     // wait 60 secs after established in loiter if RTL was due to Failsafe
                     do_jump_to_landing = true;
                 }
             } else {
-                if (AP_HAL::millis() - loiter.start_time_ms > 300*1000) {
+                if (AP_HAL::millis() > loiter.start_time_ms + 300*1000) {
                     // wait 300 secs after established in loiter (general case)
                     do_jump_to_landing = true;
                 }
