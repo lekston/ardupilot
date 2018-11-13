@@ -541,6 +541,7 @@ void Plane::handle_rtl_go_around()
         aparm.airspeed_cruise_cm.load();
         aparm.min_gndspeed_cm.load();
         aparm.throttle_cruise.load();
+        prev_WP_loc = current_loc;
         do_RTL(get_RTL_altitude());
     }
 
@@ -564,6 +565,12 @@ void Plane::handle_rtl_go_around()
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, aparm.throttle_max);
         }
     } else {
+        if (reached_loiter_target() &&
+            is_equal(next_WP_loc.alt, get_RTL_altitude(true)) ) {
+            // reset target altitude back to standard value
+            next_WP_loc.alt = get_RTL_altitude(false);
+            set_target_altitude_location(next_WP_loc);
+        }
         calc_nav_roll();
         calc_nav_pitch();
         calc_throttle();
