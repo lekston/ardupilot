@@ -754,7 +754,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
     float STEdot_min_rev = - _maxSinkRate_approach * GRAVITY_MSS;
 
     float THRmax_rev = THRmin_fwd; // typically equal to 0.0
-    float THRmin_rev = -0.5f;// -0.5*_THRmaxf or _THRminf (related to rev thrust interface type (1 or 2ch)
+    float THRmin_rev = -0.75f;// -0.5*_THRmaxf or _THRminf (related to rev thrust interface type (1 or 2ch)
 
     float STEdot_dem_rev = constrain_float((_SPEdot_dem + _SKEdot_dem), STEdot_min_rev, STEdot_max_rev);
     float STEdot_error_rev = STEdot_dem_rev - _SPEdot - _SKEdot;
