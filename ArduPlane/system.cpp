@@ -450,6 +450,11 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
             auto_state.vtol_mode = false;
         }
         next_WP_loc = prev_WP_loc = current_loc;
+        // restore standard speed settings
+        plane.aparm.airspeed_cruise_cm.load();
+        plane.aparm.min_gndspeed_cm.load();
+        plane.aparm.throttle_cruise.load();
+
         // start or resume the mission, based on MIS_AUTORESET
         mission.start_or_resume();
 		
