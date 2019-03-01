@@ -32,7 +32,7 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype, mode_reason_t re
         failsafe.saved_mode_set = true;
         set_mode(QLAND, reason);
         break;
-        
+
     case AUTO:
     case AVOID_ADSB:
     case GUIDED:
@@ -93,10 +93,18 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, mode_reason_t rea
         set_mode(QLAND, reason);
         break;
         
-    case AUTO:
-    case AVOID_ADSB:
     case GUIDED:
     case LOITER:
+        if (g.fs_action_long == FS_ACTION_LONG_CONTINUE ||
+            g.fs_action_long == FS_ACTION_LONG_RTL) {
+            // Timeout to RTL (even if failsafe is set to FLY)
+            // Rationale:
+            // neigher LOITER, nor GUIDED would finish safely without GCS link
+            set_mode(RTL, reason);
+        }
+        // Other options are irrelevant for FT UAV, but why are they ignored for other USERS??
+    case AUTO:
+    case AVOID_ADSB:
         if(g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
 #if PARACHUTE == ENABLED
             parachute_release();
