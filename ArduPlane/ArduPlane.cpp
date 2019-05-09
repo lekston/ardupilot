@@ -888,38 +888,6 @@ void Plane::update_flight_mode(void)
 
     case AUTOTUNE:
     case FLY_BY_WIRE_A: {
-        // set nav_roll and nav_pitch using sticks
-        nav_roll_cd  = channel_roll->norm_input() * roll_limit_cd;
-        nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
-        update_load_factor();
-        float pitch_input = channel_pitch->norm_input();
-        if (pitch_input > 0) {
-            nav_pitch_cd = pitch_input * aparm.pitch_limit_max_cd;
-        } else {
-            nav_pitch_cd = -(pitch_input * pitch_limit_min_cd);
-        }
-        adjust_nav_pitch_throttle();
-        nav_pitch_cd = constrain_int32(nav_pitch_cd, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
-        if (fly_inverted()) {
-            nav_pitch_cd = -nav_pitch_cd;
-        }
-        if (failsafe.rc_failsafe && g.fs_action_short == FS_ACTION_SHORT_FBWA) {
-            // FBWA failsafe glide
-            nav_roll_cd = 0;
-            nav_pitch_cd = 0;
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
-        }
-        if (g.fbwa_tdrag_chan > 0) {
-            // check for the user enabling FBWA taildrag takeoff mode
-            bool tdrag_mode = (RC_Channels::get_radio_in(g.fbwa_tdrag_chan-1) > 1700);
-            if (tdrag_mode && !auto_state.fbwa_tdrag_takeoff_mode) {
-                if (auto_state.highest_airspeed < g.takeoff_tdrag_speed1) {
-                    auto_state.fbwa_tdrag_takeoff_mode = true;
-                    gcs().send_text(MAV_SEVERITY_WARNING, "FBWA tdrag mode");
-                }
-            }
-        }
-
         // do throttle linearization
         {
             // removed:         channel_throttle->input(); // write pwm to radio_in (was used i.a. by percent_input())
@@ -957,6 +925,38 @@ void Plane::update_flight_mode(void)
             throttle_dem = constrain_float( throttle_dem, 0.0f, 100.0f);
 
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, throttle_dem);
+        }
+
+        // set nav_roll and nav_pitch using sticks
+        nav_roll_cd  = channel_roll->norm_input() * roll_limit_cd;
+        nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
+        update_load_factor();
+        float pitch_input = channel_pitch->norm_input();
+        if (pitch_input > 0) {
+            nav_pitch_cd = pitch_input * aparm.pitch_limit_max_cd;
+        } else {
+            nav_pitch_cd = -(pitch_input * pitch_limit_min_cd);
+        }
+        adjust_nav_pitch_throttle();
+        nav_pitch_cd = constrain_int32(nav_pitch_cd, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
+        if (fly_inverted()) {
+            nav_pitch_cd = -nav_pitch_cd;
+        }
+        if (failsafe.rc_failsafe && g.fs_action_short == FS_ACTION_SHORT_FBWA) {
+            // FBWA failsafe glide
+            nav_roll_cd = 0;
+            nav_pitch_cd = 0;
+            SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+        }
+        if (g.fbwa_tdrag_chan > 0) {
+            // check for the user enabling FBWA taildrag takeoff mode
+            bool tdrag_mode = (RC_Channels::get_radio_in(g.fbwa_tdrag_chan-1) > 1700);
+            if (tdrag_mode && !auto_state.fbwa_tdrag_takeoff_mode) {
+                if (auto_state.highest_airspeed < g.takeoff_tdrag_speed1) {
+                    auto_state.fbwa_tdrag_takeoff_mode = true;
+                    gcs().send_text(MAV_SEVERITY_WARNING, "FBWA tdrag mode");
+                }
+            }
         }
 
         break;
