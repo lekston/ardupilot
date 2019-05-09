@@ -474,12 +474,26 @@ void Plane::handle_auto_mode(void)
         // allow landing to restrict the roll limits
         nav_roll_cd = landing.constrain_roll(nav_roll_cd, g.level_roll_limit*100UL);
 
+#if FT_BUILD == FT_BIRDIE_BUILD
         if (landing.is_throttle_suppressed()) {
-            // if landing is considered complete throttle is never allowed, regardless of landing type
+            // if landing is considered complete throttle is not allowed for BIRDIE
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
         } else {
             calc_throttle();
         }
+#elif FT_BUILD == FT_FENIX_BUILD
+        int16_t throttle_in = channel_throttle->get_control_in();
+        bool throttle_closed = (throttle_in < 20) && (throttle_in >= 0);
+
+        if (landing.is_throttle_suppressed() && throttle_closed) {
+            SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
+        } else {
+            calc_throttle();
+        }
+#else
+    #error "Need to define FT_FENIX_BUILD or FT_BIRDIE_BUILD"
+#endif
+
     } else {
         // we are doing normal AUTO flight, the special cases
         // are for takeoff and landing
@@ -642,9 +656,19 @@ void Plane::handle_cruise_mode(void)
     int16_t throttle_in = channel_throttle->get_control_in();
     bool throttle_closed = (throttle_in < 20) && (throttle_in >= 0);
 
-    const int16_t cflare_pitch_max_cd = 250;
-    const int16_t cflare_pitch_trim_cd  = 0; //landing.get_pitch_cd();
-    const int16_t cflare_pitch_min_cd =-400;
+    const int16_t pitch_ref_cd = landing.get_pitch_cd();
+
+#if FT_BUILD == FT_BIRDIE_BUILD
+    const int16_t cflare_pitch_max_cd   = pitch_ref_cd + 200;
+    const int16_t cflare_pitch_trim_cd  = pitch_ref_cd;
+    const int16_t cflare_pitch_min_cd   = pitch_ref_cd - 500;
+#elif FT_BUILD == FT_FENIX_BUILD
+    const int16_t cflare_pitch_max_cd   = pitch_ref_cd + 300;
+    const int16_t cflare_pitch_trim_cd  = pitch_ref_cd;
+    const int16_t cflare_pitch_min_cd   = pitch_ref_cd - 100*g.stab_pitch_down;
+#else
+    #error "Need to define FT_FENIX_BUILD or FT_BIRDIE_BUILD"
+#endif
 
     const int16_t fade_time_max = 2000;
 
