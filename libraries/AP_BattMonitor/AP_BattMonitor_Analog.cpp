@@ -52,6 +52,8 @@ AP_BattMonitor_Analog::read()
         // record time
         _state.last_time_micros = tnow;
     }
+
+    _state.cell_voltages.cells[0] = _state.voltage * 1000;
 }
 
 /// return true if battery provides current info
