@@ -291,7 +291,8 @@ void AP_Camera::send_feedback(mavlink_channel_t chan)
             // caller (gcs) wants to pass high priority feedback but the queue is empty
             // this should not happen
             _queue_error_cnt++;
-            gcs().send_text(MAV_SEVERITY_WARNING, "Cam feedback unreliable (%d).", _queue_error_cnt);
+            if (_queue_error_cnt % 10 == 0)
+                gcs().send_text(MAV_SEVERITY_DEBUG, "Cam feedback unreliable (%d).", _queue_error_cnt);
         }
 
     } else {
