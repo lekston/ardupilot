@@ -84,6 +84,8 @@ void AP_BattMonitor_SMBus_Maxell::timer()
 
     read_temp();
 
+    read_cycles();
+
     read_serial_number();
 }
 

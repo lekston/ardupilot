@@ -22,6 +22,7 @@ public:
         BATTMONITOR_SMBUS_CURRENT = 0x0A,              // Current
         BATTMONITOR_SMBUS_REMAINING_CAPACITY = 0x0F,   // Remaining Capacity
         BATTMONITOR_SMBUS_FULL_CHARGE_CAPACITY = 0x10, // Full Charge Capacity
+        BATTMONITOR_SMBUS_CHARGE_CYCLE_COUNT = 0x17,   // Charge Cycle count
         BATTMONITOR_SMBUS_SPECIFICATION_INFO = 0x1A,   // Specification Info
         BATTMONITOR_SMBUS_SERIAL = 0x1C,               // Serial Number
         BATTMONITOR_SMBUS_MANUFACTURE_NAME = 0x20,     // Manufacture Name
@@ -61,6 +62,10 @@ protected:
     // returns true if the read was successful
     bool read_temp(void);
 
+    // reads the charge-discharge cycle count if it's not already known
+    // returns true if the read was successful, or the number was already known
+    bool read_cycles();
+
     // reads the serial number if it's not already known
     // returns true if the read was successful, or the number was already known
     bool read_serial_number(void);
@@ -77,6 +82,7 @@ protected:
     bool _pec_supported; // true if PEC is supported
 
     int32_t _serial_number = -1;    // battery serial number
+    int32_t _cycle_count = -1;      // number of charge-discharge cycles
     uint16_t _full_charge_capacity; // full charge capacity, used to stash the value before setting the parameter
 
     bool _has_cell_voltages;        // smbus backends flag this as true once they have recieved a valid cell voltage report

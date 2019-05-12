@@ -29,6 +29,10 @@ void AP_BattMonitor_SMBus::read(void)
         _params._serial_number.set_and_notify(_serial_number);
     }
 
+    if (_cycle_count != _params._cycle_count) {
+        _params._cycle_count.set_and_notify(_cycle_count);
+    }
+
     if (_full_charge_capacity != _params._pack_capacity) {
         _params._pack_capacity.set_and_notify(_full_charge_capacity);
     }
@@ -78,6 +82,21 @@ bool AP_BattMonitor_SMBus::read_temp(void)
         return true;
     }
 
+    return false;
+}
+
+// reads charge-discharge cycles count
+// returns true if the read was successful
+bool AP_BattMonitor_SMBus::read_cycles()
+{
+    uint16_t data;
+    // don't recheck if we already have it
+    if (_cycle_count != -1) {
+        return true;
+    } else if (read_word(BATTMONITOR_SMBUS_CHARGE_CYCLE_COUNT, data)) {
+        _cycle_count = data;
+        return true;
+    }
     return false;
 }
 

@@ -146,6 +146,12 @@ const AP_Param::GroupInfo AP_BattMonitor_Params::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("FS_CRT_ACT", 17, AP_BattMonitor_Params, _failsafe_critical_action, 0),
 
+    // @Param: CYCLE_NUM
+    // @DisplayName: Charge-Discharge Cycle Count
+    // @Description: Numer of the charge-discharge cycles; automatically filled in for SMBus batteries, otherwise will be 0
+    // @User: Advanced
+    AP_GROUPINFO("CYCLE_NUM", 18, AP_BattMonitor_Params, _cycle_count, 0),
+
     AP_GROUPEND
 
 };

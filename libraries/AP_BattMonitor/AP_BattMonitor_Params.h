@@ -50,5 +50,5 @@ public:
     AP_Float _critical_capacity;        /// capacity level used to trigger a critical battery failsafe
     AP_Int8  _failsafe_low_action;      /// action to preform on a low battery failsafe
     AP_Int8  _failsafe_critical_action; /// action to preform on a critical battery failsafe
-
+    AP_Int32 _cycle_count;              /// count of charge-discharge cycles
 };
