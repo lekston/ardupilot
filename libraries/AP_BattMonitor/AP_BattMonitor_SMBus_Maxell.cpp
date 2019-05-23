@@ -5,6 +5,7 @@
 #include "AP_BattMonitor_SMBus_Maxell.h"
 #include <utility>
 
+
 #define BATTMONITOR_SMBUS_MAXELL_NUM_CELLS 6
 uint8_t maxell_cell_ids[] = { 0x3f,  // cell 1
                               0x3e,  // cell 2
@@ -56,12 +57,24 @@ void AP_BattMonitor_SMBus_Maxell::timer()
     }
 
     // read cell voltages
-    for (uint8_t i = 0; i < BATTMONITOR_SMBUS_MAXELL_NUM_CELLS; i++) {
+    /* FT Workaround to decreased quality of external I2C on ChibiOS.
+     * Ask each cell multiple times.
+     */
+    const uint8_t FT_NUM_CELLS = 4;
+    const uint8_t FT_MAX_ITER = 20;
+    uint8_t i=0, iter=0;
+    for ( ;
+          i<FT_NUM_CELLS && iter<FT_MAX_ITER;
+          ++iter)
+    {
         if (read_word(maxell_cell_ids[i], data)) {
             _has_cell_voltages = true;
             _state.cell_voltages.cells[i] = data;
+            i++;
         } else {
             _state.cell_voltages.cells[i] = UINT16_MAX;
+            if (iter / (FT_MAX_ITER / FT_NUM_CELLS) > i)
+                i++; // try each cell same number of times
         }
     }
 
