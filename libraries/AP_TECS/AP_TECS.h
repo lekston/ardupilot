@@ -444,6 +444,11 @@ private:
     // Update Demanded Throttle Non-Airspeed
     void _update_throttle_without_airspeed(int16_t throttle_nudge);
 
+    void _underspeed_throttle_action(const float& integ_max,
+                                     const float& STEdot_error,
+                                     const float& throttle_damp,
+                                     const float& K_STE2Thr);
+
     // get integral gain which is flight_stage dependent
     float _get_i_gain(void);
 
