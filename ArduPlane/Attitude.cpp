@@ -111,7 +111,11 @@ void Plane::stabilize_pitch(float speed_scaler)
         SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, 45*force_elevator);
         return;
     }
-    int32_t demanded_pitch = nav_pitch_cd + g.pitch_trim_cd + SRV_Channels::get_output_scaled(SRV_Channel::k_throttle) * g.kff_throttle_to_pitch;
+
+    int32_t thr_feedfwd_corr = SpdHgt_Controller->get_throttle_demand() - aparm.throttle_cruise;
+
+    int32_t demanded_pitch = nav_pitch_cd + g.pitch_trim_cd + g.kff_throttle_to_pitch * thr_feedfwd_corr;
+
     bool disable_integrator = false;
     if (control_mode == STABILIZE && channel_pitch->get_control_in() != 0) {
         disable_integrator = true;
