@@ -389,23 +389,23 @@ void Plane::update_GPS_10Hz(void)
         if (ground_start_count > 1) {
             ground_start_count--;
         } else if (ground_start_count == 1) {
-            // We countdown N number of good GPS fixes
-            // so that the altitude is more accurate
-            // -------------------------------------
-            if (current_loc.lat == 0 && current_loc.lng == 0) {
-                ground_start_count = 5;
 
+            Location ahrs_origin_loc;
+            bool has_valid_origin = ahrs.get_origin(ahrs_origin_loc);
+
+            if (!has_valid_origin) {
+                ground_start_count = 5;
             } else {
-                set_home_persistently(gps.location());
+                set_home_persistently(ahrs_origin_loc);
 
                 next_WP_loc = prev_WP_loc = home;
 
                 if (g.compass_enabled) {
                     // Set compass declination automatically
-                    const Location &loc = gps.location();
-                    compass.set_initial_location(loc.lat, loc.lng);
+                    compass.set_initial_location(ahrs_origin_loc.lat, ahrs_origin_loc.lng);
                 }
                 ground_start_count = 0;
+                // GROUND START COMPLETED
             }
         }
 

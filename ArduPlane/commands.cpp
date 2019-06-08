@@ -122,14 +122,17 @@ void Plane::update_home()
         // significantly
         return;
     }
-    if (ahrs.home_is_set() && !ahrs.home_is_locked()) {
+    if (!ahrs.home_is_set()) {
+        ahrs.resetHeightDatum();
+        //Copter::Log_Write_Event(DATA_EKF_ALT_RESET);
+    }
+    else if (!ahrs.home_is_locked()) {
         Location loc;
         if(ahrs.get_position(loc)) {
             plane.set_home(loc);
         }
     }
     barometer.update_calibration();
-    ahrs.resetHeightDatum();
 }
 
 void Plane::set_home_persistently(const Location &loc)
