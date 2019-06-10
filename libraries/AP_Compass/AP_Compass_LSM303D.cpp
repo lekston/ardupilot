@@ -148,11 +148,14 @@ extern const AP_HAL::HAL &hal;
 #define INT_SRC_M               0x13
 
 #define LSM303D_MAG_DEFAULT_RANGE_GA          2
-#define LSM303D_MAG_DEFAULT_RATE            100
+#define LSM303D_MAG_DEFAULT_RATE             50
+
+#define AVERAGING_SAMPLE_SIZE                 5
 
 AP_Compass_LSM303D::AP_Compass_LSM303D(Compass &compass, AP_HAL::OwnPtr<AP_HAL::Device> dev)
     : AP_Compass_Backend(compass)
     , _dev(std::move(dev))
+    , _averaging_queue{AVERAGING_SAMPLE_SIZE}
 {
 }
 
@@ -340,7 +343,6 @@ void AP_Compass_LSM303D::_update()
     if (!_read_sample()) {
         return;
     }
-
     Vector3f raw_field = Vector3f(_mag_x, _mag_y, _mag_z) * _mag_range_scale;
 
     // rotate raw_field from sensor frame to body frame
@@ -353,15 +355,19 @@ void AP_Compass_LSM303D::_update()
     correct_field(raw_field, _compass_instance);
 
     if (_sem->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        _mag_x_accum += raw_field.x;
-        _mag_y_accum += raw_field.y;
-        _mag_z_accum += raw_field.z;
-        _accum_count++;
-        if (_accum_count == 10) {
-            _mag_x_accum /= 2;
-            _mag_y_accum /= 2;
-            _mag_z_accum /= 2;
-            _accum_count = 5;
+        _averaging_queue.push(raw_field);
+        if (_accum_count < AVERAGING_SAMPLE_SIZE) {
+            _mag_x_accum += raw_field.x;
+            _mag_y_accum += raw_field.y;
+            _mag_z_accum += raw_field.z;
+            _accum_count++;
+        } else {
+            Vector3f expired_entry;
+            _averaging_queue.peek(expired_entry);
+            _mag_x_accum = _mag_x_accum + raw_field.x - expired_entry.x;
+            _mag_y_accum = _mag_y_accum + raw_field.y - expired_entry.y;
+            _mag_z_accum = _mag_z_accum + raw_field.z - expired_entry.z;
+            _averaging_queue.pop();
         }
         _sem->give();
     }
@@ -386,9 +392,6 @@ void AP_Compass_LSM303D::read()
 
     Vector3f field(_mag_x_accum, _mag_y_accum, _mag_z_accum);
     field /= _accum_count;
-
-    _accum_count = 0;
-    _mag_x_accum = _mag_y_accum = _mag_z_accum = 0;
 
     _sem->give();    
 

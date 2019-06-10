@@ -4,6 +4,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/Device.h>
 #include <AP_Math/AP_Math.h>
+#include <AP_HAL/utility/RingBuffer.h>
 
 #include "AP_Compass.h"
 #include "AP_Compass_Backend.h"
@@ -50,6 +51,7 @@ private:
     int16_t _mag_y;
     int16_t _mag_z;
     uint8_t _accum_count;
+    ObjectBuffer<Vector3f> _averaging_queue;
 
     uint8_t _compass_instance;
     bool _initialised;
