@@ -187,7 +187,7 @@ void Plane::calc_gndspeed_undershoot()
 
     // Use integrator based gndspd_undershoot controller
     if (gps.status() >= AP_GPS::GPS_OK_FIX_2D &&
-        !throttle_suppressed && !yawVect.is_zero() &&
+        is_flying() && !yawVect.is_zero() &&
         (aparm.min_gndspeed_cm > 0)) {
 
         float nav_bearing = radians(0.01f*nav_controller->target_bearing_cd());
