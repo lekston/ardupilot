@@ -134,6 +134,12 @@ void Plane::calc_airspeed_errors()
     } else {
         // Normal airspeed target
         target_airspeed_cm = aparm.airspeed_cruise_cm;
+#if FT_BUILD == FT_BIRDIE_BUILD
+        if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) {
+            // Take-off airspeed target
+            target_airspeed_cm = 140*aparm.airspeed_min;
+        }
+#endif
     }
 
     target_airspeed_cm_base = target_airspeed_cm;
