@@ -61,9 +61,9 @@ void AP_Compass_Backend::correct_field(Vector3f &mag, uint8_t i)
 
     // apply eliptical correction
     Matrix3f mat(
-        diagonals.x, offdiagonals.x, offdiagonals.y,
-        offdiagonals.x,    diagonals.y, offdiagonals.z,
-        offdiagonals.y, offdiagonals.z,    diagonals.z
+        diagonals.x,    offdiagonals.x, offdiagonals.y,
+                  0,       diagonals.y, offdiagonals.z,
+                  0,                 0,    diagonals.z
     );
 
     mag = mat * mag;
