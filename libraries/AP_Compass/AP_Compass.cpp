@@ -453,6 +453,57 @@ const AP_Param::GroupInfo Compass::var_info[] = {
     // @Description: When enabled this will automatically check the orientation of compasses on successful completion of compass calibration. If set to 2 then external compasses will have their orientation automatically corrected.
     // @Values: 0:Disabled,1:CheckOnly,2:CheckAndFix
     AP_GROUPINFO("AUTO_ROT", 35, Compass, _rotate_auto, HAL_COMPASS_AUTO_ROT_DEFAULT),
+
+    /*************************************************************************/
+    /*********** Soft-Iron Lower off-diagonals (for rotation & skew) *********/
+
+    // @Param: LODI_X
+    // @DisplayName: Compass soft-iron lower off-diagonal Y_X component
+    // @Description: LODI_X in the compass soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+
+    // @Param: LODI_Y
+    // @DisplayName: Compass soft-iron lower off-diagonal Z_X component
+    // @Description: LODI_Y in the compass soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+
+    // @Param: LODI_Z
+    // @DisplayName: Compass soft-iron lower off-diagonal X_Y component
+    // @Description: LODI_Z in the compass soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+    AP_GROUPINFO("LODI",    36, Compass, _state[0].lower_offdiags, 0),
+
+    // @Param: LODI2_X
+    // @DisplayName: Compass2 soft-iron lower off-diagonal Y_X component
+    // @Description: LODI_X in the compass2 soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+
+    // @Param: LODI2_Y
+    // @DisplayName: Compass2 soft-iron lower off-diagonal Z_X component
+    // @Description: LODI_Y in the compass2 soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+
+    // @Param: LODI2_Z
+    // @DisplayName: Compass2 soft-iron lower off-diagonal X_Y component
+    // @Description: LODI_Z in the compass2 soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+    AP_GROUPINFO("LODI2",    37, Compass, _state[1].lower_offdiags, 0),
+
+    // @Param: LODI3_X
+    // @DisplayName: Compass3 soft-iron lower off-diagonal Y_X component
+    // @Description: LODI_X in the compass3 soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+
+    // @Param: LODI3_Y
+    // @DisplayName: Compass3 soft-iron lower off-diagonal Z_X component
+    // @Description: LODI_Y in the compass3 soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+
+    // @Param: LODI3_Z
+    // @DisplayName: Compass3 soft-iron lower off-diagonal X_Y component
+    // @Description: LODI_Z in the compass3 soft-iron calibration matrix: [[DIA_X, ODI_X, ODI_Y], [LODI_X, DIA_Y, ODI_Z], [LODI_Y, LODI_Z, DIA_Z]]
+    // @User: Advanced
+    AP_GROUPINFO("LODI3",    38, Compass, _state[2].lower_offdiags, 0),
     
     AP_GROUPEND
 };

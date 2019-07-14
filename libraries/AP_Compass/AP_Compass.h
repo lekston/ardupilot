@@ -430,6 +430,7 @@ private:
         AP_Vector3f offset;
         AP_Vector3f diagonals;
         AP_Vector3f offdiagonals;
+        AP_Vector3f lower_offdiags;
 
         // device id detected at init.
         // saved to eeprom when offsets are saved allowing ram &

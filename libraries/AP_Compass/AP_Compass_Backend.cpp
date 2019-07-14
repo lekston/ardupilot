@@ -53,7 +53,8 @@ void AP_Compass_Backend::correct_field(Vector3f &mag, uint8_t i)
 
     const Vector3f &offsets = state.offset.get();
     const Vector3f &diagonals = state.diagonals.get();
-    const Vector3f &offdiagonals = state.offdiagonals.get();
+    const Vector3f &upper_offdiags = state.offdiagonals.get();
+    const Vector3f &lower_offdiags = state.lower_offdiags.get();
     const Vector3f &mot = state.motor_compensation.get();
 
     // add in the basic offsets
@@ -61,9 +62,9 @@ void AP_Compass_Backend::correct_field(Vector3f &mag, uint8_t i)
 
     // apply eliptical correction
     Matrix3f mat(
-        diagonals.x,    offdiagonals.x, offdiagonals.y,
-                  0,       diagonals.y, offdiagonals.z,
-                  0,                 0,    diagonals.z
+        diagonals.x,      upper_offdiags.x, upper_offdiags.y,
+        lower_offdiags.x,      diagonals.y, upper_offdiags.z,
+        lower_offdiags.y, lower_offdiags.z,       diagonals.z
     );
 
     mag = mat * mag;
