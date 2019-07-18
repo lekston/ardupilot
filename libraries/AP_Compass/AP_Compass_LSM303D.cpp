@@ -155,7 +155,7 @@ extern const AP_HAL::HAL &hal;
 AP_Compass_LSM303D::AP_Compass_LSM303D(Compass &compass, AP_HAL::OwnPtr<AP_HAL::Device> dev)
     : AP_Compass_Backend(compass)
     , _dev(std::move(dev))
-    , _averaging_queue{AVERAGING_SAMPLE_SIZE}
+    , _averaging_queue{AVERAGING_SAMPLE_SIZE + 1}
 {
 }
 
@@ -356,11 +356,10 @@ void AP_Compass_LSM303D::_update()
 
     if (_sem->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
         _averaging_queue.push(raw_field);
-        if (_accum_count < AVERAGING_SAMPLE_SIZE) {
+        if (_averaging_queue.available() < AVERAGING_SAMPLE_SIZE) {
             _mag_x_accum += raw_field.x;
             _mag_y_accum += raw_field.y;
             _mag_z_accum += raw_field.z;
-            _accum_count++;
         } else {
             Vector3f expired_entry;
             _averaging_queue.peek(expired_entry);
@@ -384,14 +383,14 @@ void AP_Compass_LSM303D::read()
         return;
     }
     
-    if (_accum_count == 0) {
+    if (_averaging_queue.available() == 0) {
         /* We're not ready to publish*/
         _sem->give();
         return;
     }
 
     Vector3f field(_mag_x_accum, _mag_y_accum, _mag_z_accum);
-    field /= _accum_count;
+    field /= _averaging_queue.available();
 
     _sem->give();    
 

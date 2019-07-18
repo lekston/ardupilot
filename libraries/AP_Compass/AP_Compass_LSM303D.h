@@ -50,7 +50,6 @@ private:
     int16_t _mag_x;
     int16_t _mag_y;
     int16_t _mag_z;
-    uint8_t _accum_count;
     ObjectBuffer<Vector3f> _averaging_queue;
 
     uint8_t _compass_instance;
