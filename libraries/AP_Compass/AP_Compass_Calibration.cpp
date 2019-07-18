@@ -152,6 +152,7 @@ Compass::_accept_calibration(uint8_t i)
         set_and_save_offsets(i, ofs);
         set_and_save_diagonals(i,diag);
         set_and_save_offdiagonals(i,offdiag);
+        set_and_save_lower_offdiags(i,offdiag);
 
         if (_state[i].external && _rotate_auto >= 2) {
             _state[i].orientation.set_and_save_ifchanged(cal.get_orientation());

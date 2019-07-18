@@ -1141,6 +1141,15 @@ Compass::set_and_save_offdiagonals(uint8_t i, const Vector3f &offdiagonals)
 }
 
 void
+Compass::set_and_save_lower_offdiags(uint8_t i, const Vector3f &lower_offdiags)
+{
+    // sanity check compass instance provided
+    if (i < COMPASS_MAX_INSTANCES) {
+        _state[i].lower_offdiags.set_and_save(lower_offdiags);
+    }
+}
+
+void
 Compass::save_offsets(uint8_t i)
 {
     _state[i].offset.save();  // save offsets
