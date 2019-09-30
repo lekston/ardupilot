@@ -155,7 +155,7 @@ void Plane::takeoff_calc_pitch(void)
             // pitch demand until the roll recovers
             float roll_error_rad = radians(constrain_float(labs(nav_roll_cd - ahrs.roll_sensor) * 0.01, 0, 90));
             float reduction = sq(cosf(roll_error_rad));
-            nav_pitch_cd *= reduction;
+            nav_pitch_cd *= reduction; // TODO NOT good if already negative!!
         }
     }
 }
